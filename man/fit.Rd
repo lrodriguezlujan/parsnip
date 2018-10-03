@@ -2,15 +2,17 @@
 % Please edit documentation in R/fit.R
 \name{fit.model_spec}
 \alias{fit.model_spec}
-\alias{fit}
 \alias{fit_xy}
+\alias{fit_xy.model_spec}
 \title{Fit a Model Specification to a Dataset}
 \usage{
 \method{fit}{model_spec}(object, formula = NULL, data = NULL,
   engine = object$engine, control = fit_control(), ...)
 
-fit_xy(object, x = NULL, y = NULL, engine = object$engine,
-  control = fit_control(), ...)
+fit_xy(object, ...)
+
+\method{fit_xy}{model_spec}(object, x = NULL, y = NULL,
+  engine = object$engine, control = fit_control(), ...)
 }
 \arguments{
 \item{object}{An object of class \code{model_spec}}
@@ -54,6 +56,8 @@ object with the error message.
 a formula and non-formula interface (such as the \code{terms}
 object)
 }
+The return value will also have a class related to the fitted model (e.g.
+\code{"_glm"}) before the base class of \code{"model_fit"}.
 }
 \description{
 \code{fit} and \code{fit_xy} take a model specification, translate the required

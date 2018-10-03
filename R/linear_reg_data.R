@@ -5,7 +5,7 @@ linear_reg_arg_key <- data.frame(
   spark  =  c("reg_param", "elastic_net_param"),
   stan   =  c(        NA,                  NA),
   stringsAsFactors = FALSE,
-  row.names =  c("regularization", "mixture")
+  row.names =  c("penalty", "mixture")
 )
 
 linear_reg_modes <- "regression"
@@ -18,24 +18,8 @@ linear_reg_engines <- data.frame(
   row.names =  c("regression")
 )
 
-###################################################################
 
-organize_glmnet_pred <- function(x, object) {
-  if (ncol(x) == 1) {
-    res <- x[, 1]
-    res <- unname(res)
-  } else {
-    n <- nrow(x)
-    res <- utils::stack(as.data.frame(x))
-    if (!is.null(object$spec$args$regularization))
-      res$lambda <- rep(object$spec$args$regularization, each = n) else
-        res$lambda <- rep(object$fit$lambda, each = n)
-    res <- res[, colnames(res) %in% c("values", "lambda")]
-  }
-  res
-}
-
-###################################################################
+# ------------------------------------------------------------------------------
 
 linear_reg_lm_data <-
   list(
@@ -123,7 +107,7 @@ linear_reg_glmnet_data <-
           object = quote(object$fit),
           newx = quote(as.matrix(new_data)),
           type = "response",
-          s = quote(object$spec$args$regularization)
+          s = quote(object$spec$args$penalty)
         )
     ),
     raw = list(
@@ -162,44 +146,53 @@ linear_reg_stan_data <-
     confint = list(
       pre = NULL,
       post = function(results, object) {
-        tibble(
-          .pred_lower = 
-            convert_stan_interval(
-              results, 
-              level = object$spec$method$confint$args$level
-            ),
-          .pred_upper = 
-            convert_stan_interval(
-              results, 
-              level = object$spec$method$confint$args$level,
-              lower = FALSE
-          ),
-        )
+        res <-
+          tibble(
+            .pred_lower =
+              convert_stan_interval(
+                results,
+                level = object$spec$method$confint$extras$level
+              ),
+            .pred_upper =
+              convert_stan_interval(
+                results,
+                level = object$spec$method$confint$extras$level,
+                lower = FALSE
+              ),
+          )
+        if(object$spec$method$confint$extras$std_error)
+          res$.std_error <- apply(results, 2, sd, na.rm = TRUE)
+        res
       },
       func = c(pkg = "rstanarm", fun = "posterior_linpred"),
       args =
         list(
           object = quote(object$fit),
           newdata = quote(new_data),
+          transform = TRUE,
           seed = expr(sample.int(10^5, 1))
         )
     ),
     predint = list(
       pre = NULL,
       post = function(results, object) {
-        tibble(
-          .pred_lower = 
-            convert_stan_interval(
-              results, 
-              level = object$spec$method$predint$args$level
-            ),
-          .pred_upper = 
-            convert_stan_interval(
-              results, 
-              level = object$spec$method$predint$args$level,
-              lower = FALSE
-            ),
-        )
+        res <-
+          tibble(
+            .pred_lower =
+              convert_stan_interval(
+                results,
+                level = object$spec$method$predint$extras$level
+              ),
+            .pred_upper =
+              convert_stan_interval(
+                results,
+                level = object$spec$method$predint$extras$level,
+                lower = FALSE
+              ),
+          )
+        if(object$spec$method$predint$extras$std_error)
+          res$.std_error <- apply(results, 2, sd, na.rm = TRUE)
+        res
       },
       func = c(pkg = "rstanarm", fun = "posterior_predict"),
       args =
@@ -220,15 +213,28 @@ linear_reg_stan_data <-
     )
   )
 
-
+#' @importFrom  dplyr select rename
 linear_reg_spark_data <-
   list(
     libs = "sparklyr",
     fit = list(
       interface = "formula",
       protect = c("x", "formula", "weight_col"),
-      func = c(pkg = "sparklyr", fun = "ml_linear_regression"),
-      defaults = list()
+      func = c(pkg = "sparklyr", fun = "ml_linear_regression")
+    ),
+    pred = list(
+      pre = NULL,
+      post = function(results, object) {
+        results <- dplyr::rename(results, pred = prediction)
+        results <- dplyr::select(results, pred)
+        results
+      },
+      func = c(pkg = "sparklyr", fun = "ml_predict"),
+      args =
+        list(
+          x = quote(object$fit),
+          dataset = quote(new_data)
+        )
     )
   )
 

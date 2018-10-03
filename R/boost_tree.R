@@ -24,18 +24,9 @@
 #'  time that the model is fit. Other options and argument can be
 #'  set using the `others` argument. If left to their defaults
 #'  here (`NULL`), the values are taken from the underlying model
-#'  functions.
+#'  functions.  If parameters need to be modified, `update` can be used
+#'  in lieu of recreating the object from scratch.
 #'
-#' The data given to the function are not saved and are only used
-#'  to determine the _mode_ of the model. For `boost_tree`, the
-#'  possible modes are "regression" and "classification".
-#'
-#' The model can be created using the `fit()` function using the
-#'  following _engines_:
-#' \itemize{
-#' \item \pkg{R}:  `"xgboost"`, `"C5.0"`
-#' \item \pkg{Spark}: `"spark"`
-#' }
 #' @param mode A single character string for the type of model.
 #'  Possible values for this model are "unknown", "regression", or
 #'  "classification".
@@ -59,9 +50,60 @@
 #'  each iteration while `C5.0` samples once during traning.
 #' @param ... Used for method consistency. Any arguments passed to
 #'  the ellipses will result in an error. Use `others` instead.
-#' @details Main parameter arguments (and those in `others`) can avoid
+#' @details
+#' The data given to the function are not saved and are only used
+#'  to determine the _mode_ of the model. For `boost_tree`, the
+#'  possible modes are "regression" and "classification".
+#'
+#' The model can be created using the `fit()` function using the
+#'  following _engines_:
+#' \itemize{
+#' \item \pkg{R}:  `"xgboost"`, `"C5.0"`
+#' \item \pkg{Spark}: `"spark"`
+#' }
+#'
+#' Main parameter arguments (and those in `others`) can avoid
 #'  evaluation until the underlying function is executed by wrapping the
 #'  argument in [rlang::expr()] (e.g. `mtry = expr(floor(sqrt(p)))`).
+#'
+#' Engines may have pre-set default arguments when executing the
+#'  model fit call. These can be changed by using the `others`
+#'  argument to pass in the preferred values. For this type of
+#'  model, the template of the fit calls are:
+#'
+#' \pkg{xgboost} classification
+#'
+#' \Sexpr[results=rd]{parsnip:::show_fit(parsnip:::boost_tree(mode = "classification"), "xgboost")}
+#'
+#' \pkg{xgboost} regression
+#'
+#' \Sexpr[results=rd]{parsnip:::show_fit(parsnip:::boost_tree(mode = "regression"), "xgboost")}
+#'
+#' \pkg{C5.0} classification
+#'
+#' \Sexpr[results=rd]{parsnip:::show_fit(parsnip:::boost_tree(mode = "classification"), "C5.0")}
+#'
+#' \pkg{spark} classification
+#'
+#' \Sexpr[results=rd]{parsnip:::show_fit(parsnip:::boost_tree(mode = "classification"), "spark")}
+#'
+#' \pkg{spark} regression
+#'
+#' \Sexpr[results=rd]{parsnip:::show_fit(parsnip:::boost_tree(mode = "regression"), "spark")}
+#'
+#' @note For models created using the spark engine, there are
+#'  several differences to consider. First, only the formula
+#'  interface to via `fit` is available; using `fit_xy` will
+#'  generate an error. Second, the predictions will always be in a
+#'  spark table format. The names will be the same as documented but
+#'  without the dots. Third, there is no equivalent to factor
+#'  columns in spark tables so class predictions are returned as
+#'  character columns. Fourth, to retain the model object for a new
+#'  R session (via `save`), the `model$fit` element of the `parsnip`
+#'  object should be serialized via `ml_save(object$fit)` and
+#'  separately saved to disk. In a new session, the object can be
+#'  reloaded and reattached to the `parsnip` object.
+#'
 #' @importFrom purrr map_lgl
 #' @seealso [varying()], [fit()]
 #' @examples
@@ -121,13 +163,8 @@ print.boost_tree <- function(x, ...) {
   invisible(x)
 }
 
-###################################################################
+# ------------------------------------------------------------------------------
 
-#' Update a Boosted Tree Specification
-#'
-#' If parameters need to be modified, this function can be used
-#'  in lieu of recreating the object from scratch.
-#'
 #' @export
 #' @inheritParams boost_tree
 #' @param object A boosted tree model specification.
@@ -179,7 +216,7 @@ update.boost_tree <-
     object
   }
 
-###################################################################
+# ------------------------------------------------------------------------------
 
 #' @export
 translate.boost_tree <- function(x, engine, ...) {
@@ -196,4 +233,327 @@ translate.boost_tree <- function(x, engine, ...) {
       x$method$fit$args$type <- x$mode
   }
   x
+}
+
+
+# xgboost helpers --------------------------------------------------------------
+
+xgb_train <- function(
+  x, y,
+  max_depth = 6, nrounds = 15, eta  = 0.3, colsample_bytree = 1,
+  min_child_weight = 1, gamma = 0, subsample = 1, ...) {
+
+  num_class <- if (length(levels(y)) > 2) length(levels(y)) else NULL
+
+  if (is.numeric(y)) {
+    loss <- "reg:linear"
+  } else {
+    lvl <- levels(y)
+    y <- as.numeric(y) - 1
+    if (length(lvl) == 2) {
+      loss <- "binary:logistic"
+    } else {
+      loss <- "multi:softprob"
+    }
+  }
+
+  if (is.data.frame(x))
+    x <- as.matrix(x) # maybe use model.matrix here?
+
+  n <- nrow(x)
+  p <- ncol(x)
+
+  if (!inherits(x, "xgb.DMatrix"))
+    x <- xgboost::xgb.DMatrix(x, label = y, missing = NA)
+  else
+    xgboost::setinfo(x, "label", y)
+
+  # translate `subsample` and `colsample_bytree` to be on (0, 1] if not
+  if(subsample > 1)
+    subsample <- subsample/n
+  if(subsample > 1)
+    subsample <- 1
+
+  if(colsample_bytree > 1)
+    colsample_bytree <- colsample_bytree/p
+  if(colsample_bytree > 1)
+    colsample_bytree <- 1
+
+  arg_list <- list(
+    eta = eta,
+    max_depth = max_depth,
+    gamma = gamma,
+    colsample_bytree = colsample_bytree,
+    min_child_weight = min_child_weight,
+    subsample = subsample
+  )
+
+  # eval if contains expressions?
+
+  main_args <- list(
+    data = quote(x),
+    params = arg_list,
+    nrounds = nrounds,
+    objective = loss
+  )
+  if (!is.null(num_class))
+    main_args$num_class <- num_class
+
+  call <- make_call(fun = "xgb.train", ns = "xgboost", main_args)
+
+  # override or add some other args
+  others <- list(...)
+  others <-
+    others[!(names(others) %in% c("data", "weights", "nrounds", "num_class", names(arg_list)))]
+  if (length(others) > 0)
+    for (i in names(others))
+      call[[i]] <- others[[i]]
+
+  eval_tidy(call, env = current_env())
+}
+
+#' @importFrom stats binomial
+xgb_pred <- function(object, newdata, ...) {
+  if (!inherits(newdata, "xgb.DMatrix")) {
+    newdata <- as.matrix(newdata)
+    newdata <- xgboost::xgb.DMatrix(data = newdata, missing = NA)
+  }
+
+  res <- predict(object, newdata, ...)
+
+  x = switch(
+    object$params$objective,
+    "reg:linear" =, "reg:logistic" =, "binary:logistic" = res,
+    "binary:logitraw" = stats::binomial()$linkinv(res),
+    "multi:softprob" = matrix(res, ncol = object$params$num_class, byrow = TRUE),
+    res
+  )
+  x
+}
+
+#' @importFrom purrr map_df
+#' @export
+multi_predict._xgb.Booster <-
+  function(object, new_data, type = NULL, trees = NULL, ...) {
+    if (is.null(trees))
+      trees <- object$fit$nIter
+    trees <- sort(trees)
+
+    if (is.null(type)) {
+      if (object$spec$mode == "classification")
+        type <- "class"
+      else
+        type <- "numeric"
+    }
+
+    res <-
+      map_df(trees, xgb_by_tree, object = object,
+             new_data = new_data, type = type, ...)
+    res <- arrange(res, .row, trees)
+    res <- split(res[, -1], res$.row)
+    names(res) <- NULL
+    tibble(.pred = res)
+  }
+
+# Catboost definition -----------------------------------------------------
+
+catboost_train <- function(
+  x, y,
+  depth = 6, iterations = 500, learning_rate  = 0.03, rsm = 1,
+  logging_level = 'Silent', thread_count = 1, ...) {
+
+  if (is.numeric(y)) {
+    loss <- "RMSE"
+    eval_loss <- "RMSE"
+  } else {
+
+    if(is.logical(y)){
+      lvl <- c(F,T)
+      dif <- 0
+    } else {
+      lvl <- levels(y)
+      dif <- 1
+    }
+
+    y <- as.integer(y) - dif
+
+    if (length(lvl) == 2) {
+      loss <- "Logloss"
+      eval_loss <- "AUC"
+    } else {
+      loss <- "CrossEntropy"
+      eval_loss <- "MultiClass"
+    }
+  }
+
+  n <- nrow(x)
+  p <- ncol(x)
+
+  x <- catboost::catboost.load_pool(x, label = y, feature_names = as.list(colnames(x)) )
+
+  # `colsample_bytree` to be on (0, 1] if not
+
+  if(rsm > 1)
+    rsm <- rsm/p
+  rsm <- min(1, rsm)
+
+  arg_list <- list(
+    depth = depth,
+    iterations = iterations,
+    learning_rate = learning_rate,
+    rsm = rsm,
+    loss_function = loss,
+    eval_metric = eval_loss,
+    allow_writing_files = FALSE,
+    logging_level = logging_level,
+    thread_count = thread_count)
+
+  # eval if contains expressions?
+  others <- list(...)
+
+  # Not really proud of this.
+  if (all(c("test_data","test_label") %in% names(others)) ) {
+    if(loss != "RMSE"){
+      test_label <- as.integer(others$test_label) - dif
+    }
+
+    tpool <- catboost::catboost.load_pool(as.data.frame(others$test_data)[,colnames(x)],
+                                          label = test_label,
+                                          feature_names = as.list(colnames(x)) )
+  } else {
+    tpool <- NULL
+  }
+
+
+  others <-
+    others[!(names(others) %in% c("learn_pool", "test_pool", "test_data", "test_label",
+                                  "subsample", names(arg_list)))]
+
+  main_args <- list(
+    learn_pool = quote(x),
+    test_pool = quote(tpool),
+    params = arg_list)
+
+  call <- make_call(fun = "catboost.train", ns = "catboost", main_args)
+
+  # override or add some other args
+  if (length(others) > 0)
+    for (i in names(others))
+      call[[i]] <- others[[i]]
+
+  ret <- eval_tidy(call, env = rlang::current_env())
+
+  if (loss != "RMSE") {
+    ret$levels <- lvl
+  }
+
+  ret
+}
+
+catboost_pred <- function(object, newdata, pred_type, ...) {
+
+  newdata <- catboost::catboost.load_pool(newdata, feature_names = as.list(colnames(newdata)))
+
+  res <- catboost::catboost.predict(object, newdata, verbose = FALSE,
+                                    prediction_type = pred_type, ...)
+
+  if(pred_type == "Probability"){
+    if (!is.data.frame(res) & !is.matrix(res)){
+      res <- cbind( res, 1-res)
+    }
+
+    res <- as.data.frame(res)
+    colnames(res) <- object$levels
+  } else if (pred_type == "Class") {
+    res <- object$levels[res+1]
+  }
+
+  res
+
+}
+
+xgb_by_tree <- function(tree, object, new_data, type, ...) {
+  pred <- xgb_pred(object$fit, newdata = new_data, ntreelimit = tree)
+
+  # switch based on prediction type
+  if(object$spec$mode == "regression") {
+    pred <- tibble(.pred = pred)
+    nms <- names(pred)
+  } else {
+    if (type == "class") {
+      pred <- boost_tree_xgboost_data$classes$post(pred, object)
+      pred <- tibble(.pred = factor(pred, levels = object$lvl))
+    } else {
+      pred <- boost_tree_xgboost_data$prob$post(pred, object)
+      pred <- as_tibble(pred)
+      names(pred) <- paste0(".pred_", names(pred))
+    }
+    nms <- names(pred)
+  }
+  pred[["trees"]] <- tree
+  pred[[".row"]] <- 1:nrow(new_data)
+  pred[, c(".row", "trees", nms)]
+}
+
+# C5.0 helpers -----------------------------------------------------------------
+
+C5.0_train <-
+  function(x, y, weights = NULL, trials = 15, minCases = 2, sample = 0, ...) {
+    other_args <- list(...)
+    protect_ctrl <- c("minCases", "sample")
+    protect_fit <- "trials"
+    other_args <- other_args[!(other_args %in% c(protect_ctrl, protect_fit))]
+    ctrl_args <- other_args[names(other_args) %in% names(formals(C50::C5.0Control))]
+    fit_args <- other_args[names(other_args) %in% names(formals(C50::C5.0.default))]
+
+    ctrl <- expr(C50::C5.0Control())
+    ctrl$minCases <- minCases
+    ctrl$sample <- sample
+    for(i in names(ctrl_args))
+      ctrl[[i]] <- ctrl_args[[i]]
+
+    fit_call <- expr(C50::C5.0(x = x, y = y))
+    fit_call$trials <- trials
+    fit_call$control <- ctrl
+    if(!is.null(weights))
+      fit_call$weights <- quote(weights)
+
+    for(i in names(fit_args))
+      fit_call[[i]] <- fit_args[[i]]
+    eval_tidy(fit_call)
+  }
+
+#' @export
+multi_predict._C5.0 <-
+  function(object, new_data, type = NULL, trees = NULL, ...) {
+    if (is.null(trees))
+      trees <- min(object$fit$trials)
+    trees <- sort(trees)
+
+    if (is.null(type))
+      type <- "class"
+
+    res <-
+      map_df(trees, C50_by_tree, object = object,
+             new_data = new_data, type = type, ...)
+    res <- arrange(res, .row, trees)
+    res <- split(res[, -1], res$.row)
+    names(res) <- NULL
+    tibble(.pred = res)
+  }
+
+C50_by_tree <- function(tree, object, new_data, type, ...) {
+  pred <- predict(object$fit, newdata = new_data, trials = tree, type = type)
+
+  # switch based on prediction type
+  if (type == "class") {
+    pred <- tibble(.pred = factor(pred, levels = object$lvl))
+  } else {
+    pred <- as_tibble(pred)
+    names(pred) <- paste0(".pred_", names(pred))
+  }
+  nms <- names(pred)
+  pred[["trees"]] <- tree
+  pred[[".row"]] <- 1:nrow(new_data)
+  pred[, c(".row", "trees", nms)]
 }

@@ -1,4 +1,9 @@
-#' @rdname predict.model_fit
+#' Other predict methods.
+#'
+#' These are internal functions not meant to be directly called by the user.
+#'
+#' @keywords internal
+#' @rdname other_predict
 #' @inheritParams predict.model_fit
 #' @method predict_class model_fit
 #' @export predict_class.model_fit
@@ -28,15 +33,19 @@ predict_class.model_fit <- function (object, new_data, ...) {
   }
 
   # coerce levels to those in `object`
-  if(is.vector(res) || is.factor(res))
-    res <- factor(as.character(res), levels = object$lvl) else
+  if (is.vector(res) || is.factor(res)) {
+    res <- factor(as.character(res), levels = object$lvl)
+  } else {
+    if (!inherits(res, "tbl_spark"))
       res$values <- factor(as.character(res$values), levels = object$lvl)
+  }
 
   res
 }
 
 #' @export
-#' @rdname predict.model_fit
+#' @keywords internal
+#' @rdname other_predict
 #' @inheritParams predict.model_fit
 predict_class <- function (object, ...)
   UseMethod("predict_class")

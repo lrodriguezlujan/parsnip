@@ -5,9 +5,9 @@
 \alias{update.boost_tree}
 \title{General Interface for Boosted Trees}
 \usage{
-boost_tree(mode = "unknown", mtry = NULL, trees = NULL, min_n = NULL,
-  tree_depth = NULL, learn_rate = NULL, loss_reduction = NULL,
-  sample_size = NULL, others = list(), ...)
+boost_tree(mode = "unknown", mtry = NULL, trees = NULL,
+  min_n = NULL, tree_depth = NULL, learn_rate = NULL,
+  loss_reduction = NULL, sample_size = NULL, others = list(), ...)
 
 \method{update}{boost_tree}(object, mtry = NULL, trees = NULL,
   min_n = NULL, tree_depth = NULL, learn_rate = NULL,
@@ -79,9 +79,7 @@ These arguments are converted to their specific names at the
 time that the model is fit. Other options and argument can be
 set using the \code{others} argument. If left to their defaults
 here (\code{NULL}), the values are taken from the underlying model
-functions.
-
-If parameters need to be modified, this function can be used
+functions.  If parameters need to be modified, \code{update} can be used
 in lieu of recreating the object from scratch.
 }
 \details{
@@ -99,6 +97,45 @@ following \emph{engines}:
 Main parameter arguments (and those in \code{others}) can avoid
 evaluation until the underlying function is executed by wrapping the
 argument in \code{\link[rlang:expr]{rlang::expr()}} (e.g. \code{mtry = expr(floor(sqrt(p)))}).
+
+Engines may have pre-set default arguments when executing the
+model fit call. These can be changed by using the \code{others}
+argument to pass in the preferred values. For this type of
+model, the template of the fit calls are:
+
+\pkg{xgboost} classification
+
+\Sexpr[results=rd]{parsnip:::show_fit(parsnip:::boost_tree(mode = "classification"), "xgboost")}
+
+\pkg{xgboost} regression
+
+\Sexpr[results=rd]{parsnip:::show_fit(parsnip:::boost_tree(mode = "regression"), "xgboost")}
+
+\pkg{C5.0} classification
+
+\Sexpr[results=rd]{parsnip:::show_fit(parsnip:::boost_tree(mode = "classification"), "C5.0")}
+
+\pkg{spark} classification
+
+\Sexpr[results=rd]{parsnip:::show_fit(parsnip:::boost_tree(mode = "classification"), "spark")}
+
+\pkg{spark} regression
+
+\Sexpr[results=rd]{parsnip:::show_fit(parsnip:::boost_tree(mode = "regression"), "spark")}
+}
+\note{
+For models created using the spark engine, there are
+several differences to consider. First, only the formula
+interface to via \code{fit} is available; using \code{fit_xy} will
+generate an error. Second, the predictions will always be in a
+spark table format. The names will be the same as documented but
+without the dots. Third, there is no equivalent to factor
+columns in spark tables so class predictions are returned as
+character columns. Fourth, to retain the model object for a new
+R session (via \code{save}), the \code{model$fit} element of the \code{parsnip}
+object should be serialized via \code{ml_save(object$fit)} and
+separately saved to disk. In a new session, the object can be
+reloaded and reattached to the \code{parsnip} object.
 }
 \examples{
 boost_tree(mode = "classification", trees = 20)

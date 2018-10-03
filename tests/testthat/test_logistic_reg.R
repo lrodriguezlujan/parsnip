@@ -64,10 +64,10 @@ test_that('primary arguments', {
                )
   )
 
-  regularization <- logistic_reg(regularization = 1)
-  regularization_glmnet <- translate(regularization, engine = "glmnet")
-  regularization_spark <- translate(regularization, engine = "spark")
-  expect_equal(regularization_glmnet$method$fit$args,
+  penalty <- logistic_reg(penalty = 1)
+  penalty_glmnet <- translate(penalty, engine = "glmnet")
+  penalty_spark <- translate(penalty, engine = "spark")
+  expect_equal(penalty_glmnet$method$fit$args,
                list(
                  x = quote(missing_arg()),
                  y = quote(missing_arg()),
@@ -76,7 +76,7 @@ test_that('primary arguments', {
                  family = "binomial"
                )
   )
-  expect_equal(regularization_spark$method$fit$args,
+  expect_equal(penalty_spark$method$fit$args,
                list(
                  x = quote(missing_arg()),
                  formula = quote(missing_arg()),
@@ -165,7 +165,7 @@ test_that('updating', {
   expr2     <- logistic_reg(mixture = varying())
   expr2_exp <- logistic_reg(mixture = varying(), others = list(nlambda = 10))
 
-  expr3     <- logistic_reg(mixture = 0, regularization = varying())
+  expr3     <- logistic_reg(mixture = 0, penalty = varying())
   expr3_exp <- logistic_reg(mixture = 1)
 
   expr4     <- logistic_reg(mixture = 0, others = list(nlambda = 10))
@@ -185,7 +185,7 @@ test_that('updating', {
 test_that('bad input', {
   expect_error(logistic_reg(ase.weights = var))
   expect_error(logistic_reg(mode = "regression"))
-  expect_error(logistic_reg(regularization = -1))
+  expect_error(logistic_reg(penalty = -1))
   expect_error(logistic_reg(mixture = -1))
   expect_error(translate(logistic_reg(), engine = "wat?"))
   expect_warning(translate(logistic_reg(), engine = NULL))
@@ -293,3 +293,38 @@ test_that('glm probabilities', {
   expect_equal(xy_pred[1,], one_row)
 
 })
+
+
+
+test_that('glm intervals', {
+  stats_glm <- glm(Class ~ log(funded_amnt) + int_rate, data = lending_club,
+                   family = binomial)
+  pred_glm <- predict(stats_glm, newdata = lending_club[1:5, ], se.fit = TRUE)
+  t_val <- qt(0.035, df = stats_glm$df.residual, lower.tail = FALSE)
+  lower_glm <- pred_glm$fit - t_val * pred_glm$se.fit
+  upper_glm <- pred_glm$fit + t_val * pred_glm$se.fit
+
+  lower_glm <- stats_glm$family$linkinv(lower_glm)
+  upper_glm <- stats_glm$family$linkinv(upper_glm)
+
+  res <- fit(
+    logistic_reg(),
+    Class ~ log(funded_amnt) + int_rate,
+    data = lending_club,
+    engine = "glm",
+    control = ctrl
+  )
+
+  confidence_parsnip <-
+    predict(res,
+            new_data = lending_club[1:5,],
+            type = "conf_int",
+            level = 0.93,
+            std_error = TRUE)
+
+  expect_equivalent(confidence_parsnip$.pred_lower, lower_glm)
+  expect_equivalent(confidence_parsnip$.pred_upper, upper_glm)
+  expect_equivalent(confidence_parsnip$.std_error, pred_glm$se.fit)
+
+})
+

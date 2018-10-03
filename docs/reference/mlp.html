@@ -54,6 +54,9 @@
         <li>
   <a href="../articles/parsnip_Intro.html">Basic Usage</a>
 </li>
+<li>
+  <a href="../articles/articles/Models.html">Model List</a>
+</li>
 <li class="dropdown">
   <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
     Articles
@@ -101,35 +104,30 @@
 a model before fitting and allows the model to be created using
 different packages in R or via keras The main arguments for the
 model are:</p><ul>
-<li><p><code>hidden_units</code>: The number of units in the hidden layer.</p></li>
-<li><p><code>regularization</code>: The amount of L2 regularization (aka weight
-decay).</p></li>
+<li><p><code>hidden_units</code>: The number of units in the hidden layer
+(default: 5).</p></li>
+<li><p><code>penalty</code>: The amount of L2 regularization (aka weight
+decay, default is zero).</p></li>
 <li><p><code>dropout</code>: The proportion of parameters randomly dropped out of
-the model (<code>keras</code> only).</p></li>
-<li><p><code>epochs</code>: The number of training iterations.</p></li>
+the model (<code>keras</code> only, default is zero).</p></li>
+<li><p><code>epochs</code>: The number of training iterations (default: 20).</p></li>
 <li><p><code>activation</code>: The type of function that connects the hidden
-layer and the input variables  (<code>keras</code> only).</p></li>
-</ul><p>These arguments are converted to their specific names at the
-time that the model is fit. Other options and argument can be
-set using the <code>others</code> argument. If left to their defaults
-here (<code>NULL</code>), the values are taken from the underlying model
-functions. One exception is <code>hidden_units</code> when <code><a href='http://www.rdocumentation.org/packages/nnet/topics/nnet'>nnet::nnet</a></code> is used; that
-function's <code>size</code> argument has no default so a value of 5 units will be
-used. Also, unless otherwise specified, the <code>linout</code> argument to
-<code><a href='http://www.rdocumentation.org/packages/nnet/topics/nnet'>nnet::nnet</a></code> will be set to <code>TRUE</code> when a regression model is created.</p>
-<p>If parameters need to be modified, this function can be used
+layer and the input variables  (<code>keras</code> only, default is softmax).</p></li>
+</ul>
+
+    <p>If parameters need to be modified, this function can be used
 in lieu of recreating the object from scratch.</p>
     
     </div>
 
-    <pre class="usage"><span class='fu'>mlp</span>(<span class='kw'>mode</span> <span class='kw'>=</span> <span class='st'>"unknown"</span>, <span class='kw'>hidden_units</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>regularization</span> <span class='kw'>=</span> <span class='kw'>NULL</span>,
-  <span class='kw'>dropout</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>epochs</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>activation</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>others</span> <span class='kw'>=</span> <span class='fu'>list</span>(),
-  <span class='no'>...</span>)
+    <pre class="usage"><span class='fu'>mlp</span>(<span class='kw'>mode</span> <span class='kw'>=</span> <span class='st'>"unknown"</span>, <span class='kw'>hidden_units</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>penalty</span> <span class='kw'>=</span> <span class='kw'>NULL</span>,
+  <span class='kw'>dropout</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>epochs</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>activation</span> <span class='kw'>=</span> <span class='kw'>NULL</span>,
+  <span class='kw'>others</span> <span class='kw'>=</span> <span class='fu'>list</span>(), <span class='no'>...</span>)
 
 <span class='co'># S3 method for mlp</span>
-<span class='fu'>update</span>(<span class='no'>object</span>, <span class='kw'>hidden_units</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>regularization</span> <span class='kw'>=</span> <span class='kw'>NULL</span>,
-  <span class='kw'>dropout</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>epochs</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>activation</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>others</span> <span class='kw'>=</span> <span class='fu'>list</span>(),
-  <span class='kw'>fresh</span> <span class='kw'>=</span> <span class='fl'>FALSE</span>, <span class='no'>...</span>)</pre>
+<span class='fu'>update</span>(<span class='no'>object</span>, <span class='kw'>hidden_units</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>penalty</span> <span class='kw'>=</span> <span class='kw'>NULL</span>,
+  <span class='kw'>dropout</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>epochs</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>activation</span> <span class='kw'>=</span> <span class='kw'>NULL</span>,
+  <span class='kw'>others</span> <span class='kw'>=</span> <span class='fu'>list</span>(), <span class='kw'>fresh</span> <span class='kw'>=</span> <span class='fl'>FALSE</span>, <span class='no'>...</span>)</pre>
     
     <h2 class="hasAnchor" id="arguments"><a class="anchor" href="#arguments"></a>Arguments</h2>
     <table class="ref-arguments">
@@ -145,7 +143,7 @@ Possible values for this model are "unknown", "regression", or
       <td><p>An integer for the number of units in the hidden model.</p></td>
     </tr>
     <tr>
-      <th>regularization</th>
+      <th>penalty</th>
       <td><p>A non-negative numeric value for the amount of weight
 decay.</p></td>
     </tr>
@@ -194,9 +192,16 @@ modified in-place of or replaced wholesale.</p></td>
     
     <h2 class="hasAnchor" id="details"><a class="anchor" href="#details"></a>Details</h2>
 
-    <p>The data given to the function are not saved and are only used
-to determine the <em>mode</em> of the model. For <code>mlp</code>, the
-possible modes are "regression" and "classification".</p>
+    <p>These arguments are converted to their specific names at the
+time that the model is fit. Other options and argument can be
+set using the <code>others</code> argument. If left to their defaults
+here (see above), the values are taken from the underlying model
+functions. One exception is <code>hidden_units</code> when <code><a href='http://www.rdocumentation.org/packages/nnet/topics/nnet'>nnet::nnet</a></code> is used; that
+function's <code>size</code> argument has no default so a value of 5 units will be
+used. Also, unless otherwise specified, the <code>linout</code> argument to
+<code><a href='http://www.rdocumentation.org/packages/nnet/topics/nnet'>nnet::nnet</a></code> will be set to <code>TRUE</code> when a regression model is created.
+If parameters need to be modified, <code>update</code> can be used
+in lieu of recreating the object from scratch.</p>
 <p>The model can be created using the <code>fit()</code> function using the
 following <em>engines</em>:</p><ul>
 <li><p><span class="pkg">R</span>:  <code>"nnet"</code></p></li>
@@ -205,8 +210,30 @@ following <em>engines</em>:</p><ul>
     <p>Main parameter arguments (and those in <code>others</code>) can avoid
 evaluation until the underlying function is executed by wrapping the
 argument in <code><a href='http://www.rdocumentation.org/packages/rlang/topics/quotation'>rlang::expr()</a></code> (e.g. <code>hidden_units = expr(num_preds * 2)</code>).</p>
-<p>An error is thrown if both <code>regularization</code> and <code>dropout</code> are specified for
+<p>An error is thrown if both <code>penalty</code> and <code>dropout</code> are specified for
 <code>keras</code> models.</p>
+<p>Engines may have pre-set default arguments when executing the
+model fit call. These can be changed by using the <code>others</code>
+argument to pass in the preferred values. For this type of
+model, the template of the fit calls are:</p>
+<p><span class="pkg">keras</span> classification</p>
+<p><pre>
+keras_mlp(x = missing_arg(), y = missing_arg())
+</pre></p>
+<p><span class="pkg">keras</span> regression</p>
+<p><pre>
+keras_mlp(x = missing_arg(), y = missing_arg())
+</pre></p>
+<p><span class="pkg">nnet</span> classification</p>
+<p><pre>
+nnet::nnet(formula = missing_arg(), data = missing_arg(), weights = missing_arg(), 
+    size = 5, trace = FALSE, linout = FALSE)
+</pre></p>
+<p><span class="pkg">nnet</span> regression</p>
+<p><pre>
+nnet::nnet(formula = missing_arg(), data = missing_arg(), weights = missing_arg(), 
+    size = 5, trace = FALSE, linout = TRUE)
+</pre></p>
     
     <h2 class="hasAnchor" id="see-also"><a class="anchor" href="#see-also"></a>See also</h2>
 
@@ -214,10 +241,10 @@ argument in <code><a href='http://www.rdocumentation.org/packages/rlang/topics/q
     
 
     <h2 class="hasAnchor" id="examples"><a class="anchor" href="#examples"></a>Examples</h2>
-    <pre class="examples"><div class='input'><span class='fu'>mlp</span>(<span class='kw'>mode</span> <span class='kw'>=</span> <span class='st'>"classification"</span>, <span class='kw'>regularization</span> <span class='kw'>=</span> <span class='fl'>0.01</span>)</div><div class='output co'>#&gt; Single Layer Neural Network Specification (classification)
+    <pre class="examples"><div class='input'><span class='fu'>mlp</span>(<span class='kw'>mode</span> <span class='kw'>=</span> <span class='st'>"classification"</span>, <span class='kw'>penalty</span> <span class='kw'>=</span> <span class='fl'>0.01</span>)</div><div class='output co'>#&gt; Single Layer Neural Network Specification (classification)
 #&gt; 
 #&gt; Main Arguments:
-#&gt;   regularization = 0.01
+#&gt;   penalty = 0.01
 #&gt; </div><div class='input'><span class='co'># Parameters can be represented by a placeholder:</span>
 <span class='fu'>mlp</span>(<span class='kw'>mode</span> <span class='kw'>=</span> <span class='st'>"regression"</span>, <span class='kw'>hidden_units</span> <span class='kw'>=</span> <span class='fu'><a href='varying.html'>varying</a></span>())</div><div class='output co'>#&gt; Single Layer Neural Network Specification (regression)
 #&gt; 

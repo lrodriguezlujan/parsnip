@@ -54,6 +54,9 @@
         <li>
   <a href="../articles/parsnip_Intro.html">Basic Usage</a>
 </li>
+<li>
+  <a href="../articles/articles/Models.html">Model List</a>
+</li>
 <li class="dropdown">
   <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
     Articles
@@ -117,15 +120,14 @@ to split further.</p></li>
 time that the model is fit. Other options and argument can be
 set using the <code>others</code> argument. If left to their defaults
 here (<code>NULL</code>), the values are taken from the underlying model
-functions.</p>
-<p>If parameters need to be modified, this function can be used
+functions.  If parameters need to be modified, <code>update</code> can be used
 in lieu of recreating the object from scratch.</p>
     
     </div>
 
-    <pre class="usage"><span class='fu'>boost_tree</span>(<span class='kw'>mode</span> <span class='kw'>=</span> <span class='st'>"unknown"</span>, <span class='kw'>mtry</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>trees</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>min_n</span> <span class='kw'>=</span> <span class='kw'>NULL</span>,
-  <span class='kw'>tree_depth</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>learn_rate</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>loss_reduction</span> <span class='kw'>=</span> <span class='kw'>NULL</span>,
-  <span class='kw'>sample_size</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>others</span> <span class='kw'>=</span> <span class='fu'>list</span>(), <span class='no'>...</span>)
+    <pre class="usage"><span class='fu'>boost_tree</span>(<span class='kw'>mode</span> <span class='kw'>=</span> <span class='st'>"unknown"</span>, <span class='kw'>mtry</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>trees</span> <span class='kw'>=</span> <span class='kw'>NULL</span>,
+  <span class='kw'>min_n</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>tree_depth</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>learn_rate</span> <span class='kw'>=</span> <span class='kw'>NULL</span>,
+  <span class='kw'>loss_reduction</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>sample_size</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>others</span> <span class='kw'>=</span> <span class='fu'>list</span>(), <span class='no'>...</span>)
 
 <span class='co'># S3 method for boost_tree</span>
 <span class='fu'>update</span>(<span class='no'>object</span>, <span class='kw'>mtry</span> <span class='kw'>=</span> <span class='kw'>NULL</span>, <span class='kw'>trees</span> <span class='kw'>=</span> <span class='kw'>NULL</span>,
@@ -217,6 +219,49 @@ following <em>engines</em>:</p><ul>
     <p>Main parameter arguments (and those in <code>others</code>) can avoid
 evaluation until the underlying function is executed by wrapping the
 argument in <code><a href='http://www.rdocumentation.org/packages/rlang/topics/quotation'>rlang::expr()</a></code> (e.g. <code>mtry = expr(floor(sqrt(p)))</code>).</p>
+<p>Engines may have pre-set default arguments when executing the
+model fit call. These can be changed by using the <code>others</code>
+argument to pass in the preferred values. For this type of
+model, the template of the fit calls are:</p>
+<p><span class="pkg">xgboost</span> classification</p>
+<p><pre>
+xgb_train(x = missing_arg(), y = missing_arg(), nthread = 1, 
+    verbose = 0)
+</pre></p>
+<p><span class="pkg">xgboost</span> regression</p>
+<p><pre>
+xgb_train(x = missing_arg(), y = missing_arg(), nthread = 1, 
+    verbose = 0)
+</pre></p>
+<p><span class="pkg">C5.0</span> classification</p>
+<p><pre>
+C5.0_train(x = missing_arg(), y = missing_arg(), weights = missing_arg())
+</pre></p>
+<p><span class="pkg">spark</span> classification</p>
+<p><pre>
+sparklyr::ml_gradient_boosted_trees(x = missing_arg(), formula = missing_arg(), 
+    type = "classification", seed = sample.int(10^5, 1))
+</pre></p>
+<p><span class="pkg">spark</span> regression</p>
+<p><pre>
+sparklyr::ml_gradient_boosted_trees(x = missing_arg(), formula = missing_arg(), 
+    type = "regression", seed = sample.int(10^5, 1))
+</pre></p>
+    
+    <h2 class="hasAnchor" id="note"><a class="anchor" href="#note"></a>Note</h2>
+
+    <p>For models created using the spark engine, there are
+several differences to consider. First, only the formula
+interface to via <code>fit</code> is available; using <code>fit_xy</code> will
+generate an error. Second, the predictions will always be in a
+spark table format. The names will be the same as documented but
+without the dots. Third, there is no equivalent to factor
+columns in spark tables so class predictions are returned as
+character columns. Fourth, to retain the model object for a new
+R session (via <code>save</code>), the <code>model$fit</code> element of the <code>parsnip</code>
+object should be serialized via <code>ml_save(object$fit)</code> and
+separately saved to disk. In a new session, the object can be
+reloaded and reattached to the <code>parsnip</code> object.</p>
     
     <h2 class="hasAnchor" id="see-also"><a class="anchor" href="#see-also"></a>See also</h2>
 
@@ -258,6 +303,8 @@ argument in <code><a href='http://www.rdocumentation.org/packages/rlang/topics/q
       <li><a href="#value">Value</a></li>
 
       <li><a href="#details">Details</a></li>
+
+      <li><a href="#note">Note</a></li>
 
       <li><a href="#see-also">See also</a></li>
       

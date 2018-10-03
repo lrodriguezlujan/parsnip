@@ -1,9 +1,9 @@
 #' Prepend a new class
-#' 
+#'
 #' This adds an extra class to a base class of "model_spec".
-#' 
-#' @param prefix A character string for a class. 
-#' @return A character vector. 
+#'
+#' @param prefix A character string for a class.
+#' @return A character vector.
 #' @keywords internal
 #' @export
 make_classes <- function(prefix) {
@@ -44,10 +44,10 @@ print_arg_list <- function(x, ...) {
 }
 
 #' Print helper for model objects
-#' 
-#' A common format function that prints information about the model object (e.g. 
-#' arguments, calls, packages, etc). 
-#' 
+#'
+#' A common format function that prints information about the model object (e.g.
+#' arguments, calls, packages, etc).
+#'
 #' @param x A model object.
 #' @param ... Not currently used.
 #' @keywords internal
@@ -67,25 +67,20 @@ model_printer <- function(x, ...) {
     if (!is.null(x$method$fit_call)) {
       cat("Fit function:\n")
       print(x$method$fit_call)
-      if (length(x$method$library) > 0) {
-        if (length(x$method$library) > 1)
+      if (length(x$method$libs) > 0) {
+        if (length(x$method$libs) > 1)
           cat("\nRequired packages:\n")
         else
           cat("\nRequired package: ")
-        cat(paste0(x$method$library, collapse = ", "), "\n")
+        cat(paste0(x$method$libs, collapse = ", "), "\n")
       }
     }
   }
 }
 
 load_libs <- function(x, quiet) {
-  if (quiet) {
-    for (pkg in x$method$library)
-      suppressPackageStartupMessages(library(pkg, character.only = TRUE))
-  } else {
-    for (pkg in x$method$library)
-      library(pkg, character.only = TRUE)
-  }
+  for (pkg in x$method$libs)
+    suppressPackageStartupMessages(requireNamespace(pkg, quietly = quiet))
   invisible(x)
 }
 
@@ -94,14 +89,24 @@ is_missing_arg <- function(x)
 
 
 #' Print the model call
-#' 
-#' @param x A "model_spec" object. 
+#'
+#' @param x A "model_spec" object.
 #' @return A character string.
 #' @keywords internal
 #' @export
 show_call <- function(object) {
-  call2(object$method$fit$func["fun"], !!!object$method$fit$args,
-        .ns = object$method$fit$func["pkg"])
+  if (
+    is.null(object$method$fit$func["pkg"]) ||
+    is.na(object$method$fit$func["pkg"])
+  ) {
+    res <- call2(object$method$fit$func["fun"], !!!object$method$fit$args)
+  } else {
+    res <-
+      call2(object$method$fit$func["fun"],
+            !!!object$method$fit$args,
+            .ns = object$method$fit$func["pkg"])
+  }
+  res
 }
 
 make_call <- function(fun, ns, args, ...) {
@@ -128,27 +133,26 @@ resolve_args <- function(args, ...) {
 }
 
 levels_from_formula <- function(f, dat) {
-  levels(eval_tidy(f[[2]], dat))
+  if (inherits(dat, "tbl_spark"))
+    res <- NULL
+  else
+    res <- levels(eval_tidy(f[[2]], dat))
+  res
 }
 
 is_spark <- function(x)
   isTRUE(unname(x$method$fit$func["pkg"] == "sparklyr"))
 
 
-has_exprs <- function(x) {
-  if(is.null(x) | does_it_vary(x) | is_missing_arg(x))
-    return(FALSE)
-  is_symbolic(x) 
+show_fit <- function(mod, eng) {
+  mod <- translate(x = mod, engine = eng)
+  fit_call <- show_call(mod)
+  call_text <-  deparse(fit_call)
+  call_text <- paste0(call_text, collapse = "\n")
+  paste0(
+    "\\preformatted{\n",
+    call_text,
+    "\n}\n\n"
+  )
 }
 
-make_descr <- function(object) {
-  if (length(object$args) > 0)
-    expr_main <- map_lgl(object$args, has_exprs)
-  else
-    expr_main <- FALSE
-  if (length(object$others) > 0)
-    expr_others <- map_lgl(object$others, has_exprs)
-  else
-    expr_others <- FALSE
-  any(expr_main) | any(expr_others)
-}

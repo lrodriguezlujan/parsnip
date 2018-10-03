@@ -5,7 +5,7 @@ logistic_reg_arg_key <- data.frame(
   spark  =  c("reg_param", "elastic_net_param"),
   stan   =  c(        NA,                  NA),
   stringsAsFactors = FALSE,
-  row.names =  c("regularization", "mixture")
+  row.names =  c("penalty", "mixture")
 )
 
 logistic_reg_modes <- "classification"
@@ -18,46 +18,9 @@ logistic_reg_engines <- data.frame(
   row.names =  c("classification")
 )
 
-###################################################################
+# ------------------------------------------------------------------------------
 
-prob_to_class_2 <- function(x, object) {
-  x <- ifelse(x >= 0.5, object$lvl[2], object$lvl[1])
-  unname(x)
-}
-
-organize_glmnet_class <- function(x, object) {
-  if (ncol(x) == 1) {
-    res <- prob_to_class_2(x[, 1], object)
-  } else {
-    n <- nrow(x)
-    res <- utils::stack(as.data.frame(x))
-    res$values <- prob_to_class_2(res$values, object)
-    if (!is.null(object$spec$args$regularization))
-      res$lambda <- rep(object$spec$args$regularization, each = n) else
-        res$lambda <- rep(object$fit$lambda, each = n)
-    res <- res[, colnames(res) %in% c("values", "lambda")]
-  }
-  res
-}
-
-organize_glmnet_prob <- function(x, object) {
-  if (ncol(x) == 1) {
-    res <- tibble(v1 = 1 - x[, 1], v2 = x[, 1])
-    colnames(res) <- object$lvl
-  } else {
-    n <- nrow(x)
-    res <- utils::stack(as.data.frame(x))
-    res <- tibble(v1 = 1 - res$values, v2 = res$values)
-    colnames(res) <- object$lvl
-    if (!is.null(object$spec$args$regularization))
-      res$lambda <- rep(object$spec$args$regularization, each = n) else
-        res$lambda <- rep(object$fit$lambda, each = n)
-  }
-  res
-}
-
-###################################################################
-
+#' @importFrom stats qt
 logistic_reg_glm_data <-
   list(
     libs = "stats",
@@ -104,6 +67,31 @@ logistic_reg_glm_data <-
           object = quote(object$fit),
           newdata = quote(new_data)
         )
+    ),
+    confint = list(
+      pre = NULL,
+      post = function(results, object) {
+        hf_lvl <- (1 - object$spec$method$confint$extras$level)/2
+        const <-
+          qt(hf_lvl, df = object$fit$df.residual, lower.tail = FALSE)
+        trans <- object$fit$family$linkinv
+        res <-
+          tibble(
+            .pred_lower = trans(results$fit - const * results$se.fit),
+            .pred_upper = trans(results$fit + const * results$se.fit)
+          )
+        if(object$spec$method$confint$extras$std_error)
+          res$.std_error <- results$se.fit
+        res
+      },
+      func = c(fun = "predict"),
+      args =
+        list(
+          object = quote(object$fit),
+          newdata = quote(new_data),
+          se.fit = TRUE,
+          type = "link"
+        )
     )
   )
 
@@ -128,7 +116,7 @@ logistic_reg_glmnet_data <-
           object = quote(object$fit),
           newx = quote(as.matrix(new_data)),
           type = "response",
-          s = quote(object$spec$args$regularization)
+          s = quote(object$spec$args$penalty)
         )
     ),
     prob = list(
@@ -140,7 +128,7 @@ logistic_reg_glmnet_data <-
           object = quote(object$fit),
           newx = quote(as.matrix(new_data)),
           type = "response",
-          s = quote(object$spec$args$regularization)
+          s = quote(object$spec$args$penalty)
         )
     ),
     raw = list(
@@ -203,6 +191,65 @@ logistic_reg_stan_data <-
           object = quote(object$fit),
           newdata = quote(new_data)
         )
+    ),
+    confint = list(
+      pre = NULL,
+      post = function(results, object) {
+        res <-
+          tibble(
+            .pred_lower =
+              convert_stan_interval(
+                results,
+                level = object$spec$method$confint$extras$level
+              ),
+            .pred_upper =
+              convert_stan_interval(
+                results,
+                level = object$spec$method$confint$extras$level,
+                lower = FALSE
+              ),
+          )
+        if(object$spec$method$confint$extras$std_error)
+          res$.std_error <- apply(results, 2, sd, na.rm = TRUE)
+        res
+      },
+      func = c(pkg = "rstanarm", fun = "posterior_linpred"),
+      args =
+        list(
+          object = quote(object$fit),
+          newdata = quote(new_data),
+          transform = TRUE,
+          seed = expr(sample.int(10^5, 1))
+        )
+    ),
+    predint = list(
+      pre = NULL,
+      post = function(results, object) {
+        res <-
+          tibble(
+            .pred_lower =
+              convert_stan_interval(
+                results,
+                level = object$spec$method$predint$extras$level
+              ),
+            .pred_upper =
+              convert_stan_interval(
+                results,
+                level = object$spec$method$predint$extras$level,
+                lower = FALSE
+              ),
+          )
+        if(object$spec$method$predint$extras$std_error)
+          res$.std_error <- apply(results, 2, sd, na.rm = TRUE)
+        res
+      },
+      func = c(pkg = "rstanarm", fun = "posterior_predict"),
+      args =
+        list(
+          object = quote(object$fit),
+          newdata = quote(new_data),
+          seed = expr(sample.int(10^5, 1))
+        )
     )
   )
 
@@ -218,7 +265,26 @@ logistic_reg_spark_data <-
         list(
           family = "binomial"
         )
+    ),
+    classes = list(
+      pre = NULL,
+      post = format_spark_class,
+      func = c(pkg = "sparklyr", fun = "ml_predict"),
+      args =
+        list(
+          x = quote(object$fit),
+          dataset = quote(new_data)
+        )
+    ),
+    prob = list(
+      pre = NULL,
+      post = format_spark_probs,
+      func = c(pkg = "sparklyr", fun = "ml_predict"),
+      args =
+        list(
+          x = quote(object$fit),
+          dataset = quote(new_data)
+        )
     )
   )
-
 

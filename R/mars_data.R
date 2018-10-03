@@ -12,7 +12,7 @@ mars_engines <- data.frame(
   row.names =  c("classification", "regression", "unknown")
 )
 
-###################################################################
+# ------------------------------------------------------------------------------
 
 mars_earth_data <-
   list(
@@ -21,8 +21,7 @@ mars_earth_data <-
       interface = "data.frame",
       protect = c("x", "y", "weights"),
       func = c(pkg = "earth", fun = "earth"),
-      defaults =
-        list()
+      defaults = list(keepxy = TRUE)
     ),
     pred = list(
       pre = NULL,

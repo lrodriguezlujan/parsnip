@@ -5,17 +5,17 @@
 \alias{update.logistic_reg}
 \title{General Interface for Logistic Regression Models}
 \usage{
-logistic_reg(mode = "classification", regularization = NULL,
-  mixture = NULL, others = list(), ...)
+logistic_reg(mode = "classification", penalty = NULL, mixture = NULL,
+  others = list(), ...)
 
-\method{update}{logistic_reg}(object, regularization = NULL, mixture = NULL,
+\method{update}{logistic_reg}(object, penalty = NULL, mixture = NULL,
   others = list(), fresh = FALSE, ...)
 }
 \arguments{
 \item{mode}{A single character string for the type of model.
 The only possible value for this model is "classification".}
 
-\item{regularization}{An non-negative number representing the
+\item{penalty}{An non-negative number representing the
 total amount of regularization (\code{glmnet} and \code{spark} only).}
 
 \item{mixture}{A number between zero and one (inclusive) that
@@ -46,7 +46,7 @@ before fitting and allows the model to be created using
 different packages in R, Stan, or via Spark. The main arguments for the
 model are:
 \itemize{
-\item \code{regularization}: The total amount of regularization
+\item \code{penalty}: The total amount of regularization
 in the model. Note that this must be zero for some engines.
 \item \code{mixture}: The proportion of L1 regularization in
 the model. Note that this will be ignored for some engines.
@@ -55,15 +55,11 @@ These arguments are converted to their specific names at the
 time that the model is fit. Other options and argument can be
 set using the \code{others} argument. If left to their defaults
 here (\code{NULL}), the values are taken from the underlying model
-functions.
-
-If parameters need to be modified, this function can be used
+functions. If parameters need to be modified, \code{update} can be used
 in lieu of recreating the object from scratch.
 }
 \details{
-The data given to the function are not saved and are only used
-to determine the \emph{mode} of the model. For \code{logistic_reg},the
-mode will always be "classification".
+For \code{logistic_reg}, the mode will always be "classification".
 
 The model can be created using the \code{fit()} function using the
 following \emph{engines}:
@@ -72,15 +68,68 @@ following \emph{engines}:
 \item \pkg{Stan}:  \code{"stan"}
 \item \pkg{Spark}: \code{"spark"}
 }
+
+Engines may have pre-set default arguments when executing the
+model fit call. These can be changed by using the \code{others}
+argument to pass in the preferred values. For this type of
+model, the template of the fit calls are:
+
+\pkg{glm}
+
+\Sexpr[results=rd]{parsnip:::show_fit(parsnip:::logistic_reg(), "glm")}
+
+\pkg{glmnet}
+
+\Sexpr[results=rd]{parsnip:::show_fit(parsnip:::logistic_reg(), "glmnet")}
+
+\pkg{stan}
+
+\Sexpr[results=rd]{parsnip:::show_fit(parsnip:::logistic_reg(), "stan")}
+
+\pkg{spark}
+
+\Sexpr[results=rd]{parsnip:::show_fit(parsnip:::logistic_reg(), "spark")}
+
+When using \code{glmnet} models, there is the option to pass
+multiple values (or no values) to the \code{penalty} argument.
+This can have an effect on the model object results. When using
+the \code{predict} method in these cases, the return object type
+depends on the value of \code{penalty}. If a single value is
+given, the results will be a simple numeric vector. When
+multiple values or no values for \code{penalty} are used in
+\code{logistic_reg}, the \code{predict} method will return a data frame with
+columns \code{values} and \code{lambda}.
+
+For prediction, the \code{stan} engine can compute posterior
+intervals analogous to confidence and prediction intervals. In
+these instances, the units are the original outcome and when
+\code{std_error = TRUE}, the standard deviation of the posterior
+distribution (or posterior predictive distribution as
+appropriate) is returned. For \code{glm}, the standard error is in logit units
+while the intervals are in probability units.
+}
+\note{
+For models created using the spark engine, there are
+several differences to consider. First, only the formula
+interface to via \code{fit} is available; using \code{fit_xy} will
+generate an error. Second, the predictions will always be in a
+spark table format. The names will be the same as documented but
+without the dots. Third, there is no equivalent to factor
+columns in spark tables so class predictions are returned as
+character columns. Fourth, to retain the model object for a new
+R session (via \code{save}), the \code{model$fit} element of the \code{parsnip}
+object should be serialized via \code{ml_save(object$fit)} and
+separately saved to disk. In a new session, the object can be
+reloaded and reattached to the \code{parsnip} object.
 }
 \examples{
 logistic_reg()
 # Parameters can be represented by a placeholder:
-logistic_reg(regularization = varying())
-model <- logistic_reg(regularization = 10, mixture = 0.1)
+logistic_reg(penalty = varying())
+model <- logistic_reg(penalty = 10, mixture = 0.1)
 model
-update(model, regularization = 1)
-update(model, regularization = 1, fresh = TRUE)
+update(model, penalty = 1)
+update(model, penalty = 1, fresh = TRUE)
 }
 \seealso{
 \code{\link[=varying]{varying()}}, \code{\link[=fit]{fit()}}

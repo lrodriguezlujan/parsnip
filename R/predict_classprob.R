@@ -1,4 +1,5 @@
-#' @rdname predict.model_fit
+#' @keywords internal
+#' @rdname other_predict
 #' @inheritParams predict.model_fit
 #' @method predict_classprob model_fit
 #' @export predict_classprob.model_fit
@@ -29,21 +30,18 @@ predict_classprob.model_fit <- function (object, new_data, ...) {
   }
 
   # check and sort names
-  if (!is.data.frame(res))
+  if (!is.data.frame(res) & !inherits(res, "tbl_spark"))
     stop("The was a problem with the probability predictions.", call. = FALSE)
 
-  # if (!isTRUE(all(sort(colnames(res)) == sort(object$lvl))))
-  #   stop("The was a problem with the probability predictions.", call. = FALSE)
-  if (!is_tibble(res))
+  if (!is_tibble(res) & !inherits(res, "tbl_spark"))
     res <- as_tibble(res)
-
-  # res <- res[, object$lvl]
 
   res
 }
 
 #' @export
-#' @rdname predict.model_fit
+#' @keywords internal
+#' @rdname other_predict
 #' @inheritParams predict.model_fit
 predict_classprob <- function (object, ...)
   UseMethod("predict_classprob")

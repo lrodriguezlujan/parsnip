@@ -1,8 +1,9 @@
-pandoc: 1.19.2.1
-pkgdown: 1.1.0
+pandoc: 2.0.5
+pkgdown: 1.1.0.9000
 pkgdown_sha: ~
 articles:
   Classification: articles/Classification.html
+  Models: articles/Models.html
   Regression: articles/Regression.html
   Scratch: articles/Scratch.html
   parsnip_Intro: parsnip_Intro.html

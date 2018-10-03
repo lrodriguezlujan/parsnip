@@ -11,7 +11,7 @@
 #'    final model.
 #'   \item \code{prod_degree}: The highest possible degree of interaction between
 #'    features. A value of 1 indicates and additive model while a value of 2
-#'    allows, but does not guarantee, two-way interactions between features.  
+#'    allows, but does not guarantee, two-way interactions between features.
 #'   \item \code{prune_method}: The type of pruning. Possible values are listed
 #'    in `?earth`.
 #' }
@@ -19,17 +19,9 @@
 #'  time that the model is fit. Other options and argument can be
 #'  set using the `others` argument. If left to their defaults
 #'  here (`NULL`), the values are taken from the underlying model
-#'  functions.
+#'  functions. If parameters need to be modified, `update` can be used
+#'  in lieu of recreating the object from scratch.
 #'
-#' The data given to the function are not saved and are only used
-#'  to determine the _mode_ of the model. For `mars`, the
-#'  possible modes are "regression" and "classification".
-#'
-#' The model can be created using the `fit()` function using the
-#'  following _engines_:
-#' \itemize{
-#' \item \pkg{R}:  `"earth"`
-#' }
 #' @param mode A single character string for the type of model.
 #'  Possible values for this model are "unknown", "regression", or
 #'  "classification".
@@ -37,9 +29,9 @@
 #'  underlying models (e.g., `earth::earth`, etc.). If the outcome is a factor
 #'  and `mode = "classification"`, `others` can include the `glm` argument to
 #'  `earth::earth`. If this argument is not passed, it will be added prior to
-#'  the fitting occurs.  
+#'  the fitting occurs.
 #' @param num_terms The number of features that will be retained in the
-#'    final model, including the intercept. 
+#'    final model, including the intercept.
 #' @param prod_degree The highest possible interaction degree.
 #' @param prune_method The pruning method.
 #' @param ... Used for method consistency. Any arguments passed to
@@ -47,6 +39,30 @@
 #' @details Main parameter arguments (and those in `others`) can avoid
 #'  evaluation until the underlying function is executed by wrapping the
 #'  argument in [rlang::expr()].
+#'
+#' The model can be created using the `fit()` function using the
+#'  following _engines_:
+#' \itemize{
+#' \item \pkg{R}:  `"earth"`
+#' }
+#'
+#' Engines may have pre-set default arguments when executing the
+#'  model fit call. These can be changed by using the `others`
+#'  argument to pass in the preferred values. For this type of
+#'  model, the template of the fit calls are:
+#'
+#' \pkg{earth} classification
+#'
+#' \Sexpr[results=rd]{parsnip:::show_fit(parsnip:::mars(mode = "classification"), "earth")}
+#'
+#' \pkg{earth} regression
+#'
+#' \Sexpr[results=rd]{parsnip:::show_fit(parsnip:::mars(mode = "regression"), "earth")}
+#'
+#' Note that, when the model is fit, the \pkg{earth} package only has its
+#'  namespace loaded. However, if `multi_predict` is used, the package is
+#'  attached.
+#'
 #' @importFrom purrr map_lgl
 #' @seealso [varying()], [fit()]
 #' @examples
@@ -70,10 +86,10 @@ mars <-
     if (is.numeric(num_terms) && num_terms < 0)
       stop("`num_terms` should be >= 1", call. = FALSE)
     if (!does_it_vary(prune_method) &&
-        !is.null(prune_method) && 
+        !is.null(prune_method) &&
         !is.character(prune_method))
       stop("`prune_method` should be a single string value", call. = FALSE)
-    
+
     args <- list(num_terms = num_terms,
                  prod_degree = prod_degree,
                  prune_method = prune_method)
@@ -99,13 +115,8 @@ print.mars <- function(x, ...) {
   invisible(x)
 }
 
-###################################################################
+# ------------------------------------------------------------------------------
 
-#' Update a MARS Specification
-#'
-#' If parameters need to be modified, this function can be used
-#'  in lieu of recreating the object from scratch.
-#'
 #' @export
 #' @inheritParams mars
 #' @param object A MARS model specification.
@@ -152,24 +163,24 @@ update.mars <-
     object
   }
 
-###################################################################
+# ------------------------------------------------------------------------------
 
 #' @export
 translate.mars <- function(x, engine, ...) {
-  
+
   # If classification is being done, the `glm` options should be used. Check to
-  # see if it is there and, if not, add the default value. 
+  # see if it is there and, if not, add the default value.
   if (x$mode == "classification") {
     if (!("glm" %in% names(x$others))) {
       x$others$glm <- quote(list(family = stats::binomial))
     }
   }
-  
+
   x <- translate.default(x, engine, ...)
   x
 }
 
-###################################################################
+# ------------------------------------------------------------------------------
 
 #' @importFrom purrr map_dfr
 earth_submodel_pred <- function(object, new_data, terms = 2:3, ...) {
@@ -191,3 +202,52 @@ earth_reg_updater <- function(num, object, new_data, ...) {
   res
 }
 
+
+# earth helpers ----------------------------------------------------------------
+
+#' @importFrom purrr map_df
+#' @importFrom dplyr arrange
+#' @export
+multi_predict._earth <-
+  function(object, new_data, type = NULL, num_terms = NULL, ...) {
+    if (is.null(num_terms))
+      num_terms <- object$fit$selected.terms[-1]
+
+    num_terms <- sort(num_terms)
+
+    msg <-
+      paste("Please use `keepxy = TRUE` as an option to enable submodel",
+            "predictions with `earth`.")
+    if (any(names(object$spec$others) == "keepxy")) {
+      if(!object$spec$others$keepxy)
+        stop (msg, call. = FALSE)
+    } else
+      stop (msg, call. = FALSE)
+
+    if (!exists("earth"))
+      suppressPackageStartupMessages(attachNamespace("earth"))
+
+    if (is.null(type)) {
+      if (object$spec$mode == "classification")
+        type <- "class"
+      else
+        type <- "numeric"
+    }
+
+    res <-
+      map_df(num_terms, earth_by_terms, object = object,
+             new_data = new_data, type = type, ...)
+    res <- arrange(res, .row, num_terms)
+    res <- split(res[, -1], res$.row)
+    names(res) <- NULL
+    tibble(.pred = res)
+  }
+
+earth_by_terms <- function(num_terms, object, new_data, type, ...) {
+  object$fit <- update(object$fit, nprune = num_terms)
+  pred <- predict(object, new_data = new_data, type = type)
+  nms <- names(pred)
+  pred[["num_terms"]] <- num_terms
+  pred[[".row"]] <- 1:nrow(new_data)
+  pred[, c(".row", "num_terms", nms)]
+}

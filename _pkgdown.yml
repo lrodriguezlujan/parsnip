@@ -18,7 +18,8 @@ reference:
       - linear_reg
       - logistic_reg
       - mars
-      - mlp   
+      - mlp  
+      - multinom_reg 
       - rand_forest
       - surv_reg   
   - title: Infrastructure
@@ -41,6 +42,8 @@ navbar:
   left:
   - text: Basic Usage 
     href: articles/parsnip_Intro.html   
+  - text: Model List
+    href: articles/articles/Models.html   
   - text: "Articles"
     menu:
      - text: Regression modeling
