@@ -541,7 +541,7 @@ catboost_pred <- function(object, newdata, pred_type, ...) {
 
   if(pred_type == "Probability"){
     if (!is.data.frame(res) & !is.matrix(res)){
-      res <- cbind( res, 1-res)
+      res <- cbind( 1-res, res)
     }
 
     res <- as.data.frame(res)
