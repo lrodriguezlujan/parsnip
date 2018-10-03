@@ -142,7 +142,7 @@ C5.0_train <- function(x, y, weights = NULL, trials = 15, minCases = 2, sample =
 catboost_train <- function(
   x, y,
   depth = 6, iterations = 500, learning_rate  = 0.03, rsm = 1,
-  logging_level = 'Silent', thread_count = 1, od_pval = 1E-3, ...) {
+  logging_level = 'Silent', thread_count = 1, ...) {
 
   if (is.numeric(y)) {
     loss <- "RMSE"
@@ -188,14 +188,13 @@ catboost_train <- function(
     eval_metric = eval_loss,
     allow_writing_files = FALSE,
     logging_level = logging_level,
-    thread_count = thread_count,
-    od_pval = od_pval)
+    thread_count = thread_count)
 
   # eval if contains expressions?
   others <- list(...)
 
   # Not really proud of this.
-  if (all(c("test_data","test_label") %in% others)) {
+  if (all(c("test_data","test_label") %in% names(others)) ) {
     if(loss != "RMSE"){
       test_label <- as.integer(others$test_label) - dif
     }
