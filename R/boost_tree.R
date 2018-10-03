@@ -445,8 +445,7 @@ C50_by_tree <- function(tree, object, new_data, type, ...) {
 
 catboost_train <- function(
   x, y,
-  depth = 6, iterations = 500, learning_rate  = 0.03, rsm = 1,
-  logging_level = 'Silent', thread_count = 1, ...) {
+  depth = 6, iterations = 500, learning_rate  = 0.03, rsm = 1, thread_count = 1, ...) {
 
   if (is.numeric(y)) {
     loss <- "RMSE"
@@ -491,7 +490,6 @@ catboost_train <- function(
     loss_function = loss,
     eval_metric = eval_loss,
     allow_writing_files = FALSE,
-    logging_level = logging_level,
     thread_count = thread_count)
 
   # eval if contains expressions?
@@ -510,6 +508,8 @@ catboost_train <- function(
     tpool <- NULL
   }
 
+  if (!("logging_level" %in% names(others)))
+    others$logging_level <- 'Silent'
 
   others <-
     others[!(names(others) %in% c("learn_pool", "test_pool", "test_data", "test_label",
