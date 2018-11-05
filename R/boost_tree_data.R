@@ -185,7 +185,7 @@ boost_tree_catboost_data <-
       func = c(pkg = NULL, fun = "catboost_train"),
       defaults = list()
     ),
-    pred = list(
+    numeric = list(
       pre = NULL,
       post = NULL,
       func = c(fun = "catboost_pred"),
@@ -196,7 +196,7 @@ boost_tree_catboost_data <-
           pred_type = "RawFormulaVal"
         )
     ),
-    classes = list(
+    class = list(
       pre = NULL,
       post = NULL,
       func = c(pkg = NULL, fun = "catboost_pred"),
@@ -207,7 +207,7 @@ boost_tree_catboost_data <-
           pred_type = "Class"
         )
     ),
-    prob = list(
+    classprob = list(
       pre = NULL,
       post = NULL,
       func = c(pkg = NULL, fun = "catboost_pred"),
