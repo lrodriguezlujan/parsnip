@@ -124,7 +124,7 @@ decision_tree_spark_data <-
       func = c(pkg = "sparklyr", fun = "ml_decision_tree_classifier"),
       defaults =
         list(
-          seed = expr(sample.int(10^5, 1))
+          seed = rlang::expr(sample.int(10^5, 1))
         )
     ),
     numeric = list(

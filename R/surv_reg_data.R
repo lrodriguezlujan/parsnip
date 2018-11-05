@@ -32,8 +32,8 @@ surv_reg_flexsurv_data <-
       func = c(fun = "summary"),
       args =
         list(
-          object = expr(object$fit),
-          newdata = expr(new_data),
+          object = rlang::expr(object$fit),
+          newdata = rlang::expr(new_data),
           type = "mean"
         )
     ),
@@ -43,10 +43,10 @@ surv_reg_flexsurv_data <-
       func = c(fun = "summary"),
       args =
         list(
-          object = expr(object$fit),
-          newdata = expr(new_data),
+          object = rlang::expr(object$fit),
+          newdata = rlang::expr(new_data),
           type = "quantile",
-          quantiles = expr(quantile)
+          quantiles = rlang::expr(quantile)
         )
     )
   )
@@ -68,8 +68,8 @@ surv_reg_survreg_data <-
       func = c(fun = "predict"),
       args =
         list(
-          object = expr(object$fit),
-          newdata = expr(new_data),
+          object = rlang::expr(object$fit),
+          newdata = rlang::expr(new_data),
           type = "response"
         )
     ),
@@ -79,10 +79,10 @@ surv_reg_survreg_data <-
       func = c(fun = "predict"),
       args =
         list(
-          object = expr(object$fit),
-          newdata = expr(new_data),
+          object = rlang::expr(object$fit),
+          newdata = rlang::expr(new_data),
           type = "quantile",
-          p = expr(quantile)
+          p = rlang::expr(quantile)
         )
     )
   )

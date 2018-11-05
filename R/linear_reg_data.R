@@ -38,8 +38,8 @@ linear_reg_lm_data <-
       func = c(fun = "predict"),
       args =
         list(
-          object = expr(object$fit),
-          newdata = expr(new_data),
+          object = rlang::expr(object$fit),
+          newdata = rlang::expr(new_data),
           type = "response"
         )
     ),
@@ -53,10 +53,10 @@ linear_reg_lm_data <-
       func = c(fun = "predict"),
       args =
         list(
-          object = expr(object$fit),
-          newdata = expr(new_data),
+          object = rlang::expr(object$fit),
+          newdata = rlang::expr(new_data),
           interval = "confidence",
-          level = expr(level),
+          level = rlang::expr(level),
           type = "response"
         )
     ),
@@ -70,10 +70,10 @@ linear_reg_lm_data <-
       func = c(fun = "predict"),
       args =
         list(
-          object = expr(object$fit),
-          newdata = expr(new_data),
+          object = rlang::expr(object$fit),
+          newdata = rlang::expr(new_data),
           interval = "prediction",
-          level = expr(level),
+          level = rlang::expr(level),
           type = "response"
         )
     ),
@@ -82,8 +82,8 @@ linear_reg_lm_data <-
       func = c(fun = "predict"),
       args =
         list(
-          object = expr(object$fit),
-          newdata = expr(new_data)
+          object = rlang::expr(object$fit),
+          newdata = rlang::expr(new_data)
         )
     )
   )
@@ -108,10 +108,10 @@ linear_reg_glmnet_data <-
       func = c(fun = "predict"),
       args =
         list(
-          object = expr(object$fit),
-          newx = expr(as.matrix(new_data)),
+          object = rlang::expr(object$fit),
+          newx = rlang::expr(as.matrix(new_data)),
           type = "response",
-          s = expr(object$spec$args$penalty)
+          s = rlang::expr(object$spec$args$penalty)
         )
     ),
     raw = list(
@@ -119,8 +119,8 @@ linear_reg_glmnet_data <-
       func = c(fun = "predict"),
       args =
         list(
-          object = expr(object$fit),
-          newx = expr(as.matrix(new_data))
+          object = rlang::expr(object$fit),
+          newx = rlang::expr(as.matrix(new_data))
         )
     )
   )
@@ -134,7 +134,7 @@ linear_reg_stan_data <-
       func = c(pkg = "rstanarm", fun = "stan_glm"),
       defaults =
         list(
-          family = expr(stats::gaussian)
+          family = rlang::expr(stats::gaussian)
         )
     ),
     numeric = list(
@@ -143,8 +143,8 @@ linear_reg_stan_data <-
       func = c(fun = "predict"),
       args =
         list(
-          object = expr(object$fit),
-          newdata = expr(new_data)
+          object = rlang::expr(object$fit),
+          newdata = rlang::expr(new_data)
         )
     ),
     confint = list(
@@ -162,7 +162,7 @@ linear_reg_stan_data <-
                 results,
                 level = object$spec$method$confint$extras$level,
                 lower = FALSE
-              ),
+              )
           )
         if(object$spec$method$confint$extras$std_error)
           res$.std_error <- apply(results, 2, sd, na.rm = TRUE)
@@ -171,10 +171,10 @@ linear_reg_stan_data <-
       func = c(pkg = "rstanarm", fun = "posterior_linpred"),
       args =
         list(
-          object = expr(object$fit),
-          newdata = expr(new_data),
+          object = rlang::expr(object$fit),
+          newdata = rlang::expr(new_data),
           transform = TRUE,
-          seed = expr(sample.int(10^5, 1))
+          seed = rlang::expr(sample.int(10^5, 1))
         )
     ),
     predint = list(
@@ -192,7 +192,7 @@ linear_reg_stan_data <-
                 results,
                 level = object$spec$method$predint$extras$level,
                 lower = FALSE
-              ),
+              )
           )
         if(object$spec$method$predint$extras$std_error)
           res$.std_error <- apply(results, 2, sd, na.rm = TRUE)
@@ -201,9 +201,9 @@ linear_reg_stan_data <-
       func = c(pkg = "rstanarm", fun = "posterior_predict"),
       args =
         list(
-          object = expr(object$fit),
-          newdata = expr(new_data),
-          seed = expr(sample.int(10^5, 1))
+          object = rlang::expr(object$fit),
+          newdata = rlang::expr(new_data),
+          seed = rlang::expr(sample.int(10^5, 1))
         )
     ),
     raw = list(
@@ -211,8 +211,8 @@ linear_reg_stan_data <-
       func = c(fun = "predict"),
       args =
         list(
-          object = expr(object$fit),
-          newdata = expr(new_data)
+          object = rlang::expr(object$fit),
+          newdata = rlang::expr(new_data)
         )
     )
   )
@@ -236,8 +236,8 @@ linear_reg_spark_data <-
       func = c(pkg = "sparklyr", fun = "ml_predict"),
       args =
         list(
-          x = expr(object$fit),
-          dataset = expr(new_data)
+          x = rlang::expr(object$fit),
+          dataset = rlang::expr(new_data)
         )
     )
   )

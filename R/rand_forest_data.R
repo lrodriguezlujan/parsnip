@@ -107,7 +107,7 @@ rand_forest_ranger_data <-
         list(
           num.threads = 1,
           verbose = FALSE,
-          seed = expr(sample.int(10^5, 1))
+          seed = rlang::expr(sample.int(10^5, 1))
         )
     ),
     numeric = list(
@@ -119,7 +119,7 @@ rand_forest_ranger_data <-
           object = quote(object$fit),
           data = quote(new_data),
           type = "response",
-          seed = expr(sample.int(10^5, 1)),
+          seed = rlang::expr(sample.int(10^5, 1)),
           verbose = FALSE
         )
     ),
@@ -132,7 +132,7 @@ rand_forest_ranger_data <-
           object = quote(object$fit),
           data = quote(new_data),
           type = "response",
-          seed = expr(sample.int(10^5, 1)),
+          seed = rlang::expr(sample.int(10^5, 1)),
           verbose = FALSE
         )
     ),
@@ -153,7 +153,7 @@ rand_forest_ranger_data <-
         list(
           object = quote(object$fit),
           data = quote(new_data),
-          seed = expr(sample.int(10^5, 1)),
+          seed = rlang::expr(sample.int(10^5, 1)),
           verbose = FALSE
         )
     ),
@@ -164,7 +164,7 @@ rand_forest_ranger_data <-
         list(
           object = quote(object$fit),
           data = quote(new_data),
-          seed = expr(sample.int(10^5, 1))
+          seed = rlang::expr(sample.int(10^5, 1))
         )
     ),
     confint = list(
@@ -175,7 +175,7 @@ rand_forest_ranger_data <-
         list(
           object = quote(object),
           new_data = quote(new_data),
-          seed = expr(sample.int(10^5, 1))
+          seed = rlang::expr(sample.int(10^5, 1))
         )
     )
   )
@@ -244,7 +244,7 @@ rand_forest_spark_data <-
       func = c(pkg = "sparklyr", fun = "ml_random_forest"),
       defaults =
         list(
-          seed = expr(sample.int(10^5, 1))
+          seed = rlang::expr(sample.int(10^5, 1))
         )
     ),
     numeric = list(

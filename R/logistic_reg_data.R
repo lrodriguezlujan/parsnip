@@ -4,7 +4,7 @@ logistic_reg_arg_key <- data.frame(
   glmnet =  c(   "lambda",             "alpha"),
   spark  =  c("reg_param", "elastic_net_param"),
   stan   =  c(        NA,                  NA),
-  keras  =  c(   "decay",                  NA),  
+  keras  =  c(   "decay",                  NA),
   stringsAsFactors = FALSE,
   row.names =  c("penalty", "mixture")
 )
@@ -32,7 +32,7 @@ logistic_reg_glm_data <-
       func = c(pkg = "stats", fun = "glm"),
       defaults =
         list(
-          family = expr(stats::binomial)
+          family = rlang::expr(stats::binomial)
         )
     ),
     class = list(
@@ -155,7 +155,7 @@ logistic_reg_stan_data <-
       func = c(pkg = "rstanarm", fun = "stan_glm"),
       defaults =
         list(
-          family = expr(stats::binomial)
+          family = rlang::expr(stats::binomial)
         )
     ),
     class = list(
@@ -211,7 +211,7 @@ logistic_reg_stan_data <-
                 results,
                 level = object$spec$method$confint$extras$level,
                 lower = FALSE
-              ),
+              )
           )
         if(object$spec$method$confint$extras$std_error)
           res$.std_error <- apply(results, 2, sd, na.rm = TRUE)
@@ -223,7 +223,7 @@ logistic_reg_stan_data <-
           object = quote(object$fit),
           newdata = quote(new_data),
           transform = TRUE,
-          seed = expr(sample.int(10^5, 1))
+          seed = rlang::expr(sample.int(10^5, 1))
         )
     ),
     predint = list(
@@ -241,7 +241,7 @@ logistic_reg_stan_data <-
                 results,
                 level = object$spec$method$predint$extras$level,
                 lower = FALSE
-              ),
+              )
           )
         if(object$spec$method$predint$extras$std_error)
           res$.std_error <- apply(results, 2, sd, na.rm = TRUE)
@@ -252,7 +252,7 @@ logistic_reg_stan_data <-
         list(
           object = quote(object$fit),
           newdata = quote(new_data),
-          seed = expr(sample.int(10^5, 1))
+          seed = rlang::expr(sample.int(10^5, 1))
         )
     )
   )

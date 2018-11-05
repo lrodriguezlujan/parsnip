@@ -6,13 +6,13 @@ data_obj <- data_obj[data_obj != "prepare_data"]
 #' @importFrom purrr map_dfr
 #' @importFrom tibble as_tibble
 data_names <-
-  map_dfr(
+  purrr::map_dfr(
     data_obj,
     function(x)  {
       module <- names(get(x))
       if (length(module) > 1) {
         module <- table(module)
-        module <- as_tibble(module)
+        module <- tibble::as_tibble(module)
         module$object <- x
         module
       } else

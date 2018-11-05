@@ -5,10 +5,10 @@
 \alias{fit_xy.model_spec}
 \title{Fit a Model Specification to a Dataset}
 \usage{
-\method{fit}{model_spec}(object, formula = NULL, data = NULL,
+fit.model_spec(object, formula = NULL, data = NULL,
   control = fit_control(), ...)
 
-\method{fit_xy}{model_spec}(object, x = NULL, y = NULL,
+fit_xy.model_spec(object, x = NULL, y = NULL,
   control = fit_control(), ...)
 }
 \arguments{
