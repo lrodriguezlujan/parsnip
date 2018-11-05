@@ -505,7 +505,13 @@ C50_by_tree <- function(tree, object, new_data, type, ...) {
 
 catboost_train <- function(
   x, y,
-  depth = 6, iterations = 500, learning_rate  = 0.03, rsm = 1, thread_count = 1, ...) {
+  depth = 6,
+  iterations = 500,
+  learning_rate  = 0.03,
+  rsm = 1,
+  thread_count = 1,
+  weights = NULL,
+  ...) {
 
   if (is.numeric(y)) {
     loss <- "RMSE"
@@ -531,10 +537,19 @@ catboost_train <- function(
     }
   }
 
+
   n <- nrow(x)
   p <- ncol(x)
 
-  x <- catboost::catboost.load_pool(x, label = y, feature_names = as.list(colnames(x)) )
+  if (!is.null(weights) & length(weights) != n) {
+      stop("Weight length doesnt match row count")
+  }
+
+
+  x <- catboost::catboost.load_pool(x,
+                                    label = y,
+                                    feature_names = as.list(colnames(x)),
+                                    weight = weights)
 
   # `colsample_bytree` to be on (0, 1] if not
 
@@ -556,14 +571,17 @@ catboost_train <- function(
   others <- list(...)
 
   # Not really proud of this.
-  if (all(c("test_data","test_label") %in% names(others)) ) {
+  if (all(c("test_data", "test_label") %in% names(others)) ) {
     if(loss != "RMSE"){
       test_label <- as.integer(others$test_label) - dif
     }
 
+    test_weights <- others$test_weights
+
     tpool <- catboost::catboost.load_pool(as.data.frame(others$test_data)[,colnames(x)],
                                           label = test_label,
-                                          feature_names = as.list(colnames(x)) )
+                                          feature_names = as.list(colnames(x)),
+                                          weight = test_weights)
   } else {
     tpool <- NULL
   }
@@ -572,7 +590,8 @@ catboost_train <- function(
     others$logging_level <- 'Silent'
 
   others <-
-    others[!(names(others) %in% c("learn_pool", "test_pool", "test_data", "test_label",
+    others[!(names(others) %in% c("learn_pool",
+                                  "test_pool", "test_data", "test_label", "test_weights",
                                   "subsample", names(arg_list)))]
 
   arg_list <- c(arg_list, others)
