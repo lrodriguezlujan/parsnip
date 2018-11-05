@@ -57,6 +57,11 @@ convert_form_to_xy_fit <-function(
   #    cbound numeric columns, factors, Surv objects, etc).
   y <- model.response(mod_frame, type = "any")
 
+  # if y is a numeric vector, model.response() added names
+  if(is.atomic(y)) {
+    names(y) <- NULL
+  }
+
   w <- as.vector(model.weights(mod_frame))
   if (!is.null(w) && !is.numeric(w))
     stop("'weights' must be a numeric vector", call. = FALSE)
@@ -71,7 +76,7 @@ convert_form_to_xy_fit <-function(
   if (indicators) {
     x <- model.matrix(mod_terms, mod_frame, contrasts)
   } else {
-    # this still ignores -vars in formula ¯\_(ツ)_/¯
+    # this still ignores -vars in formula
     x <- model.frame(mod_terms, data)
     y_cols <- attr(mod_terms, "response")
     if (length(y_cols) > 0)

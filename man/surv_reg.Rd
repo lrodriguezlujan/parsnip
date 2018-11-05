@@ -5,10 +5,9 @@
 \alias{update.surv_reg}
 \title{General Interface for Parametric Survival Models}
 \usage{
-surv_reg(mode = "regression", dist = NULL, others = list(), ...)
+surv_reg(mode = "regression", dist = NULL)
 
-\method{update}{surv_reg}(object, dist = NULL, others = list(),
-  fresh = FALSE, ...)
+\method{update}{surv_reg}(object, dist = NULL, fresh = FALSE, ...)
 }
 \arguments{
 \item{mode}{A single character string for the type of model.
@@ -17,21 +16,12 @@ The only possible value for this model is "regression".}
 \item{dist}{A character string for the outcome distribution. "weibull" is
 the default.}
 
-\item{others}{A named list of arguments to be used by the
-underlying models (e.g., \code{flexsurv::flexsurvreg}). These are not evaluated
-until the model is fit and will be substituted into the model
-fit expression.}
-
-\item{...}{Used for S3 method consistency. Any arguments passed to
-the ellipses will result in an error. Use \code{others} instead.}
-
 \item{object}{A survival regression model specification.}
 
 \item{fresh}{A logical for whether the arguments should be
 modified in-place of or replaced wholesale.}
-}
-\value{
-An updated model specification.
+
+\item{...}{Not used for \code{update}.}
 }
 \description{
 \code{surv_reg} is a way to generate a \emph{specification} of a model
@@ -43,7 +33,7 @@ model is:
 }
 This argument is converted to its specific names at the
 time that the model is fit. Other options and argument can be
-set using the \code{others} argument. If left to its default
+set using \code{set_engine}. If left to its default
 here (\code{NULL}), the value is taken from the underlying model
 functions.
 
@@ -63,12 +53,34 @@ Also, for the \code{flexsurv::flexsurvfit} engine, the typical
 \code{strata} function cannot be used. To achieve the same effect,
 the extra parameter roles can be used (as described above).
 
+For \code{surv_reg}, the mode will always be "regression".
+
 The model can be created using the \code{fit()} function using the
 following \emph{engines}:
 \itemize{
-\item \pkg{R}:  \code{"flexsurv"}
+\item \pkg{R}:  \code{"flexsurv"}, \code{"survreg"}
 }
 }
+\section{Engine Details}{
+
+
+Engines may have pre-set default arguments when executing the
+model fit call. For this type of
+model, the template of the fit calls are:
+
+\pkg{flexsurv}
+
+\Sexpr[results=rd]{parsnip:::show_fit(parsnip:::surv_reg(), "flexsurv")}
+
+\pkg{survreg}
+
+\Sexpr[results=rd]{parsnip:::show_fit(parsnip:::surv_reg(), "survreg")}
+
+Note that \code{model = TRUE} is needed to produce quantile
+predictions when there is a stratification variable and can be
+overridden in other cases.
+}
+
 \examples{
 surv_reg()
 # Parameters can be represented by a placeholder:

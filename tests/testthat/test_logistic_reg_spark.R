@@ -1,9 +1,10 @@
 library(testthat)
-context("logistic regression execution with spark")
 library(parsnip)
 library(dplyr)
 
 # ------------------------------------------------------------------------------
+
+context("logistic regression execution with spark")
 
 ctrl <- fit_control(verbosity = 1, catch = FALSE)
 caught_ctrl <- fit_control(verbosity = 1, catch = TRUE)
@@ -29,8 +30,7 @@ test_that('spark execution', {
   expect_error(
     spark_class_fit <-
       fit(
-        logistic_reg(),
-        engine = "spark",
+        logistic_reg() %>% set_engine("spark"),
         control = ctrl,
         churn ~ .,
         data = churn_logit_tr
@@ -42,8 +42,7 @@ test_that('spark execution', {
   expect_error(
     spark_class_fit_dup <-
       fit(
-        logistic_reg(),
-        engine = "spark",
+        logistic_reg() %>% set_engine("spark"),
         control = ctrl,
         churn ~ .,
         data = churn_logit_tr

@@ -22,7 +22,7 @@
 #' }
 #' These arguments are converted to their specific names at the
 #'  time that the model is fit. Other options and argument can be
-#'  set using the `others` argument. If left to their defaults
+#'  set using the  `set_engine` function. If left to their defaults
 #'  here (`NULL`), the values are taken from the underlying model
 #'  functions.  If parameters need to be modified, `update` can be used
 #'  in lieu of recreating the object from scratch.
@@ -30,8 +30,6 @@
 #' @param mode A single character string for the type of model.
 #'  Possible values for this model are "unknown", "regression", or
 #'  "classification".
-#' @param others A named list of arguments to be used by the
-#'  underlying models (e.g., `xgboost::xgb.train`, etc.). .
 #' @param mtry An number for the number (or proportion) of predictors that will
 #'  be randomly sampled at each split when creating the tree models (`xgboost`
 #'  only).
@@ -48,8 +46,6 @@
 #' @param sample_size An number for the number (or proportion) of data that is
 #'  exposed to the fitting routine. For `xgboost`, the sampling is done at at
 #'  each iteration while `C5.0` samples once during traning.
-#' @param ... Used for method consistency. Any arguments passed to
-#'  the ellipses will result in an error. Use `others` instead.
 #' @details
 #' The data given to the function are not saved and are only used
 #'  to determine the _mode_ of the model. For `boost_tree`, the
@@ -62,14 +58,12 @@
 #' \item \pkg{Spark}: `"spark"`
 #' }
 #'
-#' Main parameter arguments (and those in `others`) can avoid
-#'  evaluation until the underlying function is executed by wrapping the
-#'  argument in [rlang::expr()] (e.g. `mtry = expr(floor(sqrt(p)))`).
+#'
+#' @section Engine Details:
 #'
 #' Engines may have pre-set default arguments when executing the
-#'  model fit call. These can be changed by using the `others`
-#'  argument to pass in the preferred values. For this type of
-#'  model, the template of the fit calls are:
+#'  model fit call.  For this type of model, the template of the
+#'  fit calls are:
 #'
 #' \pkg{xgboost} classification
 #'
@@ -105,7 +99,7 @@
 #'  reloaded and reattached to the `parsnip` object.
 #'
 #' @importFrom purrr map_lgl
-#' @seealso [varying()], [fit()]
+#' @seealso [varying()], [fit()], [set_engine()]
 #' @examples
 #' boost_tree(mode = "classification", trees = 20)
 #' # Parameters can be represented by a placeholder:
@@ -117,38 +111,25 @@ boost_tree <-
            mtry = NULL, trees = NULL, min_n = NULL,
            tree_depth = NULL, learn_rate = NULL,
            loss_reduction = NULL,
-           sample_size = NULL,
-           others = list(),
-           ...) {
-    check_empty_ellipse(...)
-
-    if (!(mode %in% boost_tree_modes))
-      stop("`mode` should be one of: ",
-           paste0("'", boost_tree_modes, "'", collapse = ", "),
-           call. = FALSE)
-
-    if (is.numeric(trees) && trees < 0)
-      stop("`trees` should be >= 1", call. = FALSE)
-    if (is.numeric(sample_size) && (sample_size < 0 | sample_size > 1))
-      stop("`sample_size` should be within [0,1]", call. = FALSE)
-    if (is.numeric(tree_depth) && tree_depth < 0)
-      stop("`tree_depth` should be >= 1", call. = FALSE)
-    if (is.numeric(min_n) && min_n < 0)
-      stop("`min_n` should be >= 1", call. = FALSE)
-
+           sample_size = NULL) {
     args <- list(
-      mtry = mtry, trees = trees, min_n = min_n, tree_depth = tree_depth,
-      learn_rate = learn_rate, loss_reduction = loss_reduction,
-      sample_size = sample_size
+      mtry = enquo(mtry),
+      trees = enquo(trees),
+      min_n = enquo(min_n),
+      tree_depth = enquo(tree_depth),
+      learn_rate = enquo(learn_rate),
+      loss_reduction = enquo(loss_reduction),
+      sample_size = enquo(sample_size)
     )
 
-    no_value <- !vapply(others, is.null, logical(1))
-    others <- others[no_value]
-
-    out <- list(args = args, others = others,
-                mode = mode, method = NULL, engine = NULL)
-    class(out) <- make_classes("boost_tree")
-    out
+    new_model_spec(
+      "boost_tree",
+      args,
+      eng_args = NULL,
+      mode,
+      method = NULL,
+      engine = NULL
+    )
   }
 
 #' @export
@@ -168,6 +149,7 @@ print.boost_tree <- function(x, ...) {
 #' @export
 #' @inheritParams boost_tree
 #' @param object A boosted tree model specification.
+#' @param ... Not used for `update`.
 #' @param fresh A logical for whether the arguments should be
 #'  modified in-place of or replaced wholesale.
 #' @return An updated model specification.
@@ -184,16 +166,18 @@ update.boost_tree <-
            mtry = NULL, trees = NULL, min_n = NULL,
            tree_depth = NULL, learn_rate = NULL,
            loss_reduction = NULL, sample_size = NULL,
-           others = list(),
-           fresh = FALSE,
-           ...) {
-    check_empty_ellipse(...)
+           fresh = FALSE, ...) {
+    update_dot_check(...)
 
     args <- list(
-      mtry = mtry, trees = trees, min_n = min_n, tree_depth = tree_depth,
-      learn_rate = learn_rate, loss_reduction = loss_reduction,
-      sample_size = sample_size
-      )
+      mtry = enquo(mtry),
+      trees = enquo(trees),
+      min_n = enquo(min_n),
+      tree_depth = enquo(tree_depth),
+      learn_rate = enquo(learn_rate),
+      loss_reduction = enquo(loss_reduction),
+      sample_size = enquo(sample_size)
+    )
 
     # TODO make these blocks into a function and document well
     if (fresh) {
@@ -206,23 +190,27 @@ update.boost_tree <-
         object$args[names(args)] <- args
     }
 
-    if (length(others) > 0) {
-      if (fresh)
-        object$others <- others
-      else
-        object$others[names(others)] <- others
-    }
-
-    object
+    new_model_spec(
+      "boost_tree",
+      args = object$args,
+      eng_args = object$eng_args,
+      mode = object$mode,
+      method = NULL,
+      engine = object$engine
+    )
   }
 
 # ------------------------------------------------------------------------------
 
 #' @export
-translate.boost_tree <- function(x, engine, ...) {
+translate.boost_tree <- function(x, engine = x$engine, ...) {
+  if (is.null(engine)) {
+    message("Used `engine = 'xgboost'` for translation.")
+    engine <- "xgboost"
+  }
   x <- translate.default(x, engine, ...)
 
-  if (x$engine == "spark") {
+  if (engine == "spark") {
     if (x$mode == "unknown")
       stop(
         "For spark boosted trees models, the mode cannot be 'unknown' ",
@@ -235,9 +223,45 @@ translate.boost_tree <- function(x, engine, ...) {
   x
 }
 
+# ------------------------------------------------------------------------------
+
+check_args.boost_tree <- function(object) {
+
+  args <- lapply(object$args, rlang::eval_tidy)
+
+  if (is.numeric(args$trees) && args$trees < 0)
+    stop("`trees` should be >= 1", call. = FALSE)
+  if (is.numeric(args$sample_size) && (args$sample_size < 0 | args$sample_size > 1))
+    stop("`sample_size` should be within [0,1]", call. = FALSE)
+  if (is.numeric(args$tree_depth) && args$tree_depth < 0)
+    stop("`tree_depth` should be >= 1", call. = FALSE)
+  if (is.numeric(args$min_n) && args$min_n < 0)
+    stop("`min_n` should be >= 1", call. = FALSE)
+
+  invisible(object)
+}
 
 # xgboost helpers --------------------------------------------------------------
 
+#' Boosted trees via xgboost
+#'
+#' `xgb_train` is a wrapper for `xgboost` tree-based models
+#'  where all of the model arguments are in the main function.
+#'
+#' @param x A data frame or matrix of predictors
+#' @param y A vector (factor or numeric) or matrix (numeric) of outcome data.
+#' @param max_depth An integer for the maximum depth of the tree.
+#' @param nrounds An integer for the number of boosting iterations.
+#' @param eta A numeric value between zero and one to control the learning rate.
+#' @param colsample_bytree Subsampling proportion of columns.
+#' @param min_child_weight A numeric value for the minimum sum of instance
+#'  weights needed in a child to continue to split.
+#' @param gamma An number for the minimum loss reduction required to make a
+#'  further partition on a leaf node of the tree
+#' @param subsample Subsampling proportion of rows.
+#' @param ... Other options to pass to `xgb.train`.
+#' @return A fitted `xgboost` object.
+#' @export
 xgb_train <- function(
   x, y,
   max_depth = 6, nrounds = 15, eta  = 0.3, colsample_bytree = 1,
@@ -335,6 +359,9 @@ xgb_pred <- function(object, newdata, ...) {
 #' @export
 multi_predict._xgb.Booster <-
   function(object, new_data, type = NULL, trees = NULL, ...) {
+    if (any(names(enquos(...)) == "newdata"))
+      stop("Did you mean to use `new_data` instead of `newdata`?", call. = FALSE)
+
     if (is.null(trees))
       trees <- object$fit$nIter
     trees <- sort(trees)
@@ -364,10 +391,10 @@ xgb_by_tree <- function(tree, object, new_data, type, ...) {
     nms <- names(pred)
   } else {
     if (type == "class") {
-      pred <- boost_tree_xgboost_data$classes$post(pred, object)
+      pred <- boost_tree_xgboost_data$class$post(pred, object)
       pred <- tibble(.pred = factor(pred, levels = object$lvl))
     } else {
-      pred <- boost_tree_xgboost_data$prob$post(pred, object)
+      pred <- boost_tree_xgboost_data$classprob$post(pred, object)
       pred <- as_tibble(pred)
       names(pred) <- paste0(".pred_", names(pred))
     }
@@ -380,22 +407,52 @@ xgb_by_tree <- function(tree, object, new_data, type, ...) {
 
 # C5.0 helpers -----------------------------------------------------------------
 
+#' Boosted trees via C5.0
+#'
+#' `C5.0_train` is a wrapper for the `C5.0()` function in the
+#' \pkg{C50} package that fits tree-based models
+#'  where all of the model arguments are in the main function.
+#'
+#' @param x A data frame or matrix of predictors.
+#' @param y A factor vector with 2 or more levels
+#' @param trials An integer specifying the number of boosting
+#'  iterations. A value of one indicates that a single model is
+#'  used.
+#' @param weights An optional numeric vector of case weights. Note
+#'  that the data used for the case weights will not be used as a
+#'  splitting variable in the model (see
+#'  \url{http://www.rulequest.com/see5-win.html#CASEWEIGHT} for
+#'  Quinlan's notes on case weights).
+#' @param minCases An integer for the smallest number of samples
+#'  that must be put in at least two of the splits.
+#' @param sample A value between (0, .999) that specifies the
+#'  random proportion of the data should be used to train the model.
+#'  By default, all the samples are used for model training. Samples
+#'  not used for training are used to evaluate the accuracy of the
+#'  model in the printed output.
+#' @param ... Other arguments to pass.
+#' @return A fitted C5.0 model.
+#' @export
 C5.0_train <-
   function(x, y, weights = NULL, trials = 15, minCases = 2, sample = 0, ...) {
     other_args <- list(...)
     protect_ctrl <- c("minCases", "sample")
     protect_fit <- "trials"
+    f_names <- names(formals(getFromNamespace("C5.0.default", "C50")))
+    c_names <- names(formals(getFromNamespace("C5.0Control", "C50")))
     other_args <- other_args[!(other_args %in% c(protect_ctrl, protect_fit))]
-    ctrl_args <- other_args[names(other_args) %in% names(formals(C50::C5.0Control))]
-    fit_args <- other_args[names(other_args) %in% names(formals(C50::C5.0.default))]
+    ctrl_args <- other_args[names(other_args) %in% c_names]
+    fit_args <- other_args[names(other_args) %in% f_names]
 
-    ctrl <- expr(C50::C5.0Control())
+    ctrl <- call2("C5.0Control", .ns = "C50")
     ctrl$minCases <- minCases
     ctrl$sample <- sample
     for(i in names(ctrl_args))
       ctrl[[i]] <- ctrl_args[[i]]
 
-    fit_call <- expr(C50::C5.0(x = x, y = y))
+    fit_call <- call2("C5.0", .ns = "C50")
+    fit_call$x <- expr(x)
+    fit_call$y <- expr(y)
     fit_call$trials <- trials
     fit_call$control <- ctrl
     if(!is.null(weights))
@@ -409,6 +466,9 @@ C5.0_train <-
 #' @export
 multi_predict._C5.0 <-
   function(object, new_data, type = NULL, trees = NULL, ...) {
+    if (any(names(enquos(...)) == "newdata"))
+      stop("Did you mean to use `new_data` instead of `newdata`?", call. = FALSE)
+
     if (is.null(trees))
       trees <- min(object$fit$trials)
     trees <- sort(trees)
@@ -553,3 +613,8 @@ catboost_pred <- function(object, newdata, pred_type, ...) {
   res
 
 }
+
+# ------------------------------------------------------------------------------
+
+#' @importFrom utils globalVariables
+utils::globalVariables(c(".row"))

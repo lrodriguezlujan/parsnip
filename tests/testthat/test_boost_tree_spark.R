@@ -1,9 +1,10 @@
 library(testthat)
-context("boosted tree execution with spark")
 library(parsnip)
 library(dplyr)
 
 # ------------------------------------------------------------------------------
+
+context("boosted tree execution with spark")
 
 ctrl <- fit_control(verbosity = 1, catch = FALSE)
 caught_ctrl <- fit_control(verbosity = 1, catch = TRUE)
@@ -29,12 +30,8 @@ test_that('spark execution', {
   expect_error(
     spark_reg_fit <-
       fit(
-        boost_tree(
-          trees = 5,
-          mode = "regression",
-          others = list(seed = 12)
-        ),
-        engine = "spark",
+        boost_tree(trees = 5, mode = "regression") %>%
+          set_engine("spark", seed = 12),
         control = ctrl,
         Sepal_Length ~ .,
         data = iris_bt_tr
@@ -46,12 +43,8 @@ test_that('spark execution', {
   expect_error(
     spark_reg_fit_dup <-
       fit(
-        boost_tree(
-          trees = 5,
-          mode = "regression",
-          others = list(seed = 12)
-        ),
-        engine = "spark",
+        boost_tree(trees = 5, mode = "regression") %>%
+          set_engine("spark", seed = 12),
         control = ctrl,
         Sepal_Length ~ .,
         data = iris_bt_tr
@@ -65,7 +58,7 @@ test_that('spark execution', {
   )
 
   expect_error(
-    spark_reg_pred_num <- predict_num(spark_reg_fit, iris_bt_te),
+    spark_reg_pred_num <- predict_numeric(spark_reg_fit, iris_bt_te),
     regexp = NA
   )
 
@@ -75,7 +68,7 @@ test_that('spark execution', {
   )
 
   expect_error(
-    spark_reg_num_dup <- predict_num(spark_reg_fit_dup, iris_bt_te),
+    spark_reg_num_dup <- predict_numeric(spark_reg_fit_dup, iris_bt_te),
     regexp = NA
   )
 
@@ -103,12 +96,8 @@ test_that('spark execution', {
   expect_error(
     spark_class_fit <-
       fit(
-        boost_tree(
-          trees = 5,
-          mode = "classification",
-          others = list(seed = 12)
-        ),
-        engine = "spark",
+        boost_tree(trees = 5, mode = "classification") %>%
+          set_engine("spark", seed = 12),
         control = ctrl,
         churn ~ .,
         data = churn_bt_tr
@@ -120,12 +109,8 @@ test_that('spark execution', {
   expect_error(
     spark_class_fit_dup <-
       fit(
-        boost_tree(
-          trees = 5,
-          mode = "classification",
-          others = list(seed = 12)
-        ),
-        engine = "spark",
+        boost_tree(trees = 5, mode = "classification") %>%
+          set_engine("spark", seed = 12),
         control = ctrl,
         churn ~ .,
         data = churn_bt_tr

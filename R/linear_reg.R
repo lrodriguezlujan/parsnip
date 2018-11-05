@@ -2,36 +2,32 @@
 #'
 #' `linear_reg` is a way to generate a _specification_ of a model
 #'  before fitting and allows the model to be created using
-#'  different packages in R, Stan, or via Spark. The main arguments for the
-#'  model are:
+#'  different packages in R, Stan, keras, or via Spark. The main
+#'  arguments for the model are:
 #' \itemize{
 #'   \item \code{penalty}: The total amount of regularization
-#'  in the model. Note that this must be zero for some engines .
+#'  in the model. Note that this must be zero for some engines.
 #'   \item \code{mixture}: The proportion of L1 regularization in
 #'  the model. Note that this will be ignored for some engines.
 #' }
 #' These arguments are converted to their specific names at the
 #'  time that the model is fit. Other options and argument can be
-#'  set using the `others` argument. If left to their defaults
+#'  set using `set_engine`. If left to their defaults
 #'  here (`NULL`), the values are taken from the underlying model
 #'  functions. If parameters need to be modified, `update` can be used
 #'  in lieu of recreating the object from scratch.
+#' @inheritParams boost_tree
 #' @param mode A single character string for the type of model.
 #'  The only possible value for this model is "regression".
-#' @param others A named list of arguments to be used by the
-#'  underlying models (e.g., `stats::lm`,
-#'  `rstanarm::stan_glm`, etc.). These are not evaluated
-#'  until the model is fit and will be substituted into the model
-#'  fit expression.
-#' @param penalty An non-negative number representing the
-#'  total amount of regularization (`glmnet` and `spark` only).
+#' @param penalty An non-negative number representing the total
+#'  amount of regularization (`glmnet`, `keras`, and `spark` only).
+#'  For `keras` models, this corresponds to purely L2 regularization
+#'  (aka weight decay) while the other models can be a combination
+#'  of L1 and L2 (depending on the value of `mixture`).
 #' @param mixture A number between zero and one (inclusive) that
 #'  represents the proportion of regularization that is used for the
 #'  L2 penalty (i.e. weight decay, or ridge regression) versus L1
 #'  (the lasso) (`glmnet` and `spark` only).
-#' @param ... Used for S3 method consistency. Any arguments passed to
-#'  the ellipses will result in an error. Use `others` instead.
-#'
 #' @details
 #' The data given to the function are not saved and are only used
 #'  to determine the _mode_ of the model. For `linear_reg`, the
@@ -43,11 +39,13 @@
 #' \item \pkg{R}:  `"lm"` or `"glmnet"`
 #' \item \pkg{Stan}:  `"stan"`
 #' \item \pkg{Spark}: `"spark"`
+#' \item \pkg{keras}: `"keras"`
 #' }
 #'
+#' @section Engine Details:
+#'
 #' Engines may have pre-set default arguments when executing the
-#'  model fit call. These can be changed by using the `others`
-#'  argument to pass in the preferred values. For this type of
+#'  model fit call. For this type of
 #'  model, the template of the fit calls are:
 #'
 #' \pkg{lm}
@@ -65,6 +63,10 @@
 #' \pkg{spark}
 #'
 #' \Sexpr[results=rd]{parsnip:::show_fit(parsnip:::linear_reg(), "spark")}
+#' 
+#' \pkg{keras}
+#'
+#' \Sexpr[results=rd]{parsnip:::show_fit(parsnip:::linear_reg(), "keras")}
 #'
 #' When using `glmnet` models, there is the option to pass
 #'  multiple values (or no values) to the `penalty` argument.
@@ -96,7 +98,7 @@
 #'  separately saved to disk. In a new session, the object can be
 #'  reloaded and reattached to the `parsnip` object.
 #'
-#' @seealso [varying()], [fit()]
+#' @seealso [varying()], [fit()], [set_engine()]
 #' @examples
 #' linear_reg()
 #' # Parameters can be represented by a placeholder:
@@ -106,39 +108,21 @@
 linear_reg <-
   function(mode = "regression",
            penalty = NULL,
-           mixture = NULL,
-           others = list(),
-           ...) {
-    check_empty_ellipse(...)
-    if (!(mode %in% linear_reg_modes))
-      stop(
-        "`mode` should be one of: ",
-        paste0("'", linear_reg_modes, "'", collapse = ", "),
-        call. = FALSE
-      )
+           mixture = NULL) {
 
-    if (all(is.numeric(penalty)) && any(penalty < 0))
-      stop("The amount of regularization should be >= 0", call. = FALSE)
-    if (is.numeric(mixture) && (mixture < 0 | mixture > 1))
-      stop("The mixture proportion should be within [0,1]", call. = FALSE)
-    if (length(mixture) > 1)
-      stop("Only one value of `mixture` is allowed.", call. = FALSE)
+    args <- list(
+      penalty = enquo(penalty),
+      mixture = enquo(mixture)
+    )
 
-    args <- list(penalty = penalty, mixture = mixture)
-
-    no_value <- !vapply(others, is.null, logical(1))
-    others <- others[no_value]
-
-    # write a constructor function
-    out <- list(
+    new_model_spec(
+      "linear_reg",
       args = args,
-      others = others,
+      eng_args = NULL,
       mode = mode,
       method = NULL,
       engine = NULL
     )
-    class(out) <- make_classes("linear_reg")
-    out
   }
 
 #' @export
@@ -156,11 +140,8 @@ print.linear_reg <- function(x, ...) {
 
 # ------------------------------------------------------------------------------
 
-#' @inheritParams linear_reg
+#' @inheritParams update.boost_tree
 #' @param object A linear regression model specification.
-#' @param fresh A logical for whether the arguments should be
-#'  modified in-place of or replaced wholesale.
-#' @return An updated model specification.
 #' @examples
 #' model <- linear_reg(penalty = 10, mixture = 0.1)
 #' model
@@ -172,17 +153,12 @@ print.linear_reg <- function(x, ...) {
 update.linear_reg <-
   function(object,
            penalty = NULL, mixture = NULL,
-           others = list(),
-           fresh = FALSE,
-           ...) {
-    check_empty_ellipse(...)
-
-    if (is.numeric(penalty) && penalty < 0)
-      stop("The amount of regularization should be >= 0", call. = FALSE)
-    if (is.numeric(mixture) && (mixture < 0 | mixture > 1))
-      stop("The mixture proportion should be within [0,1]", call. = FALSE)
-
-    args <- list(penalty = penalty, mixture = mixture)
+           fresh = FALSE, ...) {
+    update_dot_check(...)
+    args <- list(
+      penalty = enquo(penalty),
+      mixture = enquo(mixture)
+    )
 
     if (fresh) {
       object$args <- args
@@ -194,16 +170,31 @@ update.linear_reg <-
         object$args[names(args)] <- args
     }
 
-    if (length(others) > 0) {
-      if (fresh)
-        object$others <- others
-      else
-        object$others[names(others)] <- others
-    }
-
-    object
+    new_model_spec(
+      "linear_reg",
+      args = object$args,
+      eng_args = object$eng_args,
+      mode = object$mode,
+      method = NULL,
+      engine = object$engine
+    )
   }
 
+# ------------------------------------------------------------------------------
+
+check_args.linear_reg <- function(object) {
+
+  args <- lapply(object$args, rlang::eval_tidy)
+
+  if (all(is.numeric(args$penalty)) && any(args$penalty < 0))
+    stop("The amount of regularization should be >= 0", call. = FALSE)
+  if (is.numeric(args$mixture) && (args$mixture < 0 | args$mixture > 1))
+    stop("The mixture proportion should be within [0,1]", call. = FALSE)
+  if (is.numeric(args$mixture) && length(args$mixture) > 1)
+    stop("Only one value of `mixture` is allowed.", call. = FALSE)
+
+  invisible(object)
+}
 
 # ------------------------------------------------------------------------------
 
@@ -223,15 +214,50 @@ organize_glmnet_pred <- function(x, object) {
 }
 
 
+# ------------------------------------------------------------------------------
+
+#' @export
+predict._elnet <-
+  function(object, new_data, type = NULL, opts = list(), ...) {
+    if (any(names(enquos(...)) == "newdata"))
+      stop("Did you mean to use `new_data` instead of `newdata`?", call. = FALSE)
+    
+    object$spec <- eval_args(object$spec)
+    predict.model_fit(object, new_data = new_data, type = type, opts = opts, ...)
+  }
+
+#' @export
+predict_numeric._elnet <- function(object, new_data, ...) {
+  if (any(names(enquos(...)) == "newdata"))
+    stop("Did you mean to use `new_data` instead of `newdata`?", call. = FALSE)
+  
+  object$spec <- eval_args(object$spec)
+  predict_numeric.model_fit(object, new_data = new_data, ...)
+}
+
+#' @export
+predict_raw._elnet <- function(object, new_data, opts = list(), ...)  {
+  if (any(names(enquos(...)) == "newdata"))
+    stop("Did you mean to use `new_data` instead of `newdata`?", call. = FALSE)
+  
+  object$spec <- eval_args(object$spec)
+  predict_raw.model_fit(object, new_data = new_data, opts = opts, ...)
+}
+
 #' @importFrom dplyr full_join as_tibble arrange
 #' @importFrom tidyr gather
 #' @export
 multi_predict._elnet <-
   function(object, new_data, type = NULL, penalty = NULL, ...) {
+    if (any(names(enquos(...)) == "newdata"))
+      stop("Did you mean to use `new_data` instead of `newdata`?", call. = FALSE)
+    
     dots <- list(...)
     if (is.null(penalty))
       penalty <- object$fit$lambda
     dots$s <- penalty
+
+    object$spec <- eval_args(object$spec)
     pred <- predict(object, new_data = new_data, type = "raw", opts = dots)
     param_key <- tibble(group = colnames(pred), penalty = penalty)
     pred <- as_tibble(pred)

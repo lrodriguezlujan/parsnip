@@ -19,6 +19,11 @@
 #' This function can be useful when you need to understand how
 #'  `parsnip` goes from a generic model specific to a model fitting
 #'  function.
+#'  
+#' **Note**: this function is used internally and users should only use it
+#'  to understand what the underlying syntax would be. It should not be used
+#'  to modify the model specification. 
+#'  
 #' @examples
 #' lm_spec <- linear_reg(penalty = 0.01)
 #'
@@ -42,8 +47,10 @@ translate <- function (x, ...)
 #' @importFrom utils getFromNamespace
 #' @importFrom purrr list_modify
 #' @export
-translate.default <- function(x, engine, ...) {
+translate.default <- function(x, engine = x$engine, ...) {
   check_empty_ellipse(...)
+  if (is.null(engine))
+    stop("Please set an engine.", call. = FALSE)
 
   x$engine <- engine
   x <- check_engine(x)
@@ -60,7 +67,7 @@ translate.default <- function(x, engine, ...) {
   # expression unless there are dots, warn if protected args are
   # being altered
   eng_arg_key <- arg_key[[x$engine]]
-  x$others <- check_others(x$others, x$method$fit, eng_arg_key)
+  x$eng_args <- check_eng_args(x$eng_args, x$method$fit, eng_arg_key)
 
   # keep only modified args
   modifed_args <- !vapply(actual_args, null_value, lgl(1))
@@ -68,21 +75,20 @@ translate.default <- function(x, engine, ...) {
 
   # look for defaults if not modified in other
   if(length(x$method$fit$defaults) > 0) {
-    in_other <- names(x$method$fit$defaults) %in% names(x$others)
+    in_other <- names(x$method$fit$defaults) %in% names(x$eng_args)
     x$defaults <- x$method$fit$defaults[!in_other]
   }
 
-  # combine primary, others, and defaults
+  # combine primary, eng_args, and defaults
   protected <- lapply(x$method$fit$protect, function(x) expr(missing_arg()))
   names(protected) <- x$method$fit$protect
 
-  x$method$fit$args <- c(protected, actual_args, x$others, x$defaults)
+  x$method$fit$args <- c(protected, actual_args, x$eng_args, x$defaults)
 
-  # put in correct order
   x
 }
 
-get_method <- function(x, engine, ...) {
+get_method <- function(x, engine = x$engine, ...) {
   check_empty_ellipse(...)
   x$engine <- engine
   x <- check_engine(x)

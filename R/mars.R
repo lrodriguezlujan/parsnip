@@ -17,38 +17,29 @@
 #' }
 #' These arguments are converted to their specific names at the
 #'  time that the model is fit. Other options and argument can be
-#'  set using the `others` argument. If left to their defaults
+#'  set using `set_engine`. If left to their defaults
 #'  here (`NULL`), the values are taken from the underlying model
 #'  functions. If parameters need to be modified, `update` can be used
 #'  in lieu of recreating the object from scratch.
 #'
+#' @inheritParams boost_tree
 #' @param mode A single character string for the type of model.
 #'  Possible values for this model are "unknown", "regression", or
 #'  "classification".
-#' @param others A named list of arguments to be used by the
-#'  underlying models (e.g., `earth::earth`, etc.). If the outcome is a factor
-#'  and `mode = "classification"`, `others` can include the `glm` argument to
-#'  `earth::earth`. If this argument is not passed, it will be added prior to
-#'  the fitting occurs.
 #' @param num_terms The number of features that will be retained in the
 #'    final model, including the intercept.
 #' @param prod_degree The highest possible interaction degree.
 #' @param prune_method The pruning method.
-#' @param ... Used for method consistency. Any arguments passed to
-#'  the ellipses will result in an error. Use `others` instead.
-#' @details Main parameter arguments (and those in `others`) can avoid
-#'  evaluation until the underlying function is executed by wrapping the
-#'  argument in [rlang::expr()].
-#'
-#' The model can be created using the `fit()` function using the
+#' @details The model can be created using the `fit()` function using the
 #'  following _engines_:
 #' \itemize{
 #' \item \pkg{R}:  `"earth"`
 #' }
 #'
+#' @section Engine Details:
+#'
 #' Engines may have pre-set default arguments when executing the
-#'  model fit call. These can be changed by using the `others`
-#'  argument to pass in the preferred values. For this type of
+#'  model fit call.  For this type of
 #'  model, the template of the fit calls are:
 #'
 #' \pkg{earth} classification
@@ -71,36 +62,22 @@
 
 mars <-
   function(mode = "unknown",
-           num_terms = NULL, prod_degree = NULL, prune_method = NULL,
-           others = list(),
-           ...) {
-    check_empty_ellipse(...)
+           num_terms = NULL, prod_degree = NULL, prune_method = NULL) {
 
-    if (!(mode %in% mars_modes))
-      stop("`mode` should be one of: ",
-           paste0("'", mars_modes, "'", collapse = ", "),
-           call. = FALSE)
+    args <- list(
+      num_terms    = enquo(num_terms),
+      prod_degree  = enquo(prod_degree),
+      prune_method = enquo(prune_method)
+    )
 
-    if (is.numeric(prod_degree) && prod_degree < 0)
-      stop("`prod_degree` should be >= 1", call. = FALSE)
-    if (is.numeric(num_terms) && num_terms < 0)
-      stop("`num_terms` should be >= 1", call. = FALSE)
-    if (!does_it_vary(prune_method) &&
-        !is.null(prune_method) &&
-        !is.character(prune_method))
-      stop("`prune_method` should be a single string value", call. = FALSE)
-
-    args <- list(num_terms = num_terms,
-                 prod_degree = prod_degree,
-                 prune_method = prune_method)
-
-    no_value <- !vapply(others, is.null, logical(1))
-    others <- others[no_value]
-
-    out <- list(args = args, others = others,
-                mode = mode, method = NULL, engine = NULL)
-    class(out) <- make_classes("mars")
-    out
+    new_model_spec(
+      "mars",
+      args = args,
+      eng_args = NULL,
+      mode = mode,
+      method = NULL,
+      engine = NULL
+    )
   }
 
 #' @export
@@ -118,11 +95,8 @@ print.mars <- function(x, ...) {
 # ------------------------------------------------------------------------------
 
 #' @export
-#' @inheritParams mars
+#' @inheritParams update.boost_tree
 #' @param object A MARS model specification.
-#' @param fresh A logical for whether the arguments should be
-#'  modified in-place of or replaced wholesale.
-#' @return An updated model specification.
 #' @examples
 #' model <- mars(num_terms = 10, prune_method = "none")
 #' model
@@ -134,14 +108,14 @@ print.mars <- function(x, ...) {
 update.mars <-
   function(object,
            num_terms = NULL, prod_degree = NULL, prune_method = NULL,
-           others = list(),
-           fresh = FALSE,
-           ...) {
-    check_empty_ellipse(...)
+           fresh = FALSE, ...) {
+    update_dot_check(...)
 
-    args <- list(num_terms = num_terms,
-                 prod_degree = prod_degree,
-                 prune_method = prune_method)
+    args <- list(
+      num_terms    = enquo(num_terms),
+      prod_degree  = enquo(prod_degree),
+      prune_method = enquo(prune_method)
+    )
 
     if (fresh) {
       object$args <- args
@@ -153,26 +127,29 @@ update.mars <-
         object$args[names(args)] <- args
     }
 
-    if (length(others) > 0) {
-      if (fresh)
-        object$others <- others
-      else
-        object$others[names(others)] <- others
-    }
-
-    object
+    new_model_spec(
+      "mars",
+      args = object$args,
+      eng_args = object$eng_args,
+      mode = object$mode,
+      method = NULL,
+      engine = object$engine
+    )
   }
 
 # ------------------------------------------------------------------------------
 
 #' @export
-translate.mars <- function(x, engine, ...) {
-
+translate.mars <- function(x, engine = x$engine, ...) {
+  if (is.null(engine)) {
+    message("Used `engine = 'earth'` for translation.")
+    engine <- "earth"
+  }
   # If classification is being done, the `glm` options should be used. Check to
   # see if it is there and, if not, add the default value.
   if (x$mode == "classification") {
-    if (!("glm" %in% names(x$others))) {
-      x$others$glm <- quote(list(family = stats::binomial))
+    if (!("glm" %in% names(x$eng_args))) {
+      x$eng_args$glm <- quote(list(family = stats::binomial))
     }
   }
 
@@ -182,8 +159,29 @@ translate.mars <- function(x, engine, ...) {
 
 # ------------------------------------------------------------------------------
 
+check_args.mars <- function(object) {
+
+  args <- lapply(object$args, rlang::eval_tidy)
+
+  if (is.numeric(args$prod_degree) && args$prod_degree < 0)
+    stop("`prod_degree` should be >= 1", call. = FALSE)
+
+  if (is.numeric(args$num_terms) && args$num_terms < 0)
+    stop("`num_terms` should be >= 1", call. = FALSE)
+
+  if (!is_varying(args$prune_method) &&
+      !is.null(args$prune_method) &&
+      !is.character(args$prune_method))
+    stop("`prune_method` should be a single string value", call. = FALSE)
+
+  invisible(object)
+}
+
+# ------------------------------------------------------------------------------
+
 #' @importFrom purrr map_dfr
 earth_submodel_pred <- function(object, new_data, terms = 2:3, ...) {
+  load_libs(object, quiet = TRUE, attach = TRUE)
   map_dfr(terms, earth_reg_updater, object = object, newdata = new_data, ...)
 }
 
@@ -210,22 +208,33 @@ earth_reg_updater <- function(num, object, new_data, ...) {
 #' @export
 multi_predict._earth <-
   function(object, new_data, type = NULL, num_terms = NULL, ...) {
+    if (any(names(enquos(...)) == "newdata"))
+      stop("Did you mean to use `new_data` instead of `newdata`?", call. = FALSE)
+
+    load_libs(object, quiet = TRUE, attach = TRUE)
+
     if (is.null(num_terms))
       num_terms <- object$fit$selected.terms[-1]
 
     num_terms <- sort(num_terms)
 
+    # update.earth uses the values in the call so evaluate them if
+    # they are quosures
+    call_names <- names(object$fit$call)
+    call_names <- call_names[!(call_names %in% c("", "x", "y"))]
+    for (i in call_names) {
+      if (is_quosure(object$fit$call[[i]]))
+        object$fit$call[[i]] <- eval_tidy(object$fit$call[[i]])
+    }
+
     msg <-
       paste("Please use `keepxy = TRUE` as an option to enable submodel",
             "predictions with `earth`.")
-    if (any(names(object$spec$others) == "keepxy")) {
-      if(!object$spec$others$keepxy)
+    if (any(names(object$fit$call) == "keepxy")) {
+       if(!isTRUE(object$fit$call$keepxy))
         stop (msg, call. = FALSE)
     } else
       stop (msg, call. = FALSE)
-
-    if (!exists("earth"))
-      suppressPackageStartupMessages(attachNamespace("earth"))
 
     if (is.null(type)) {
       if (object$spec$mode == "classification")

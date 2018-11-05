@@ -26,14 +26,14 @@ boost_tree_xgboost_data <-
     fit = list(
       interface = "matrix",
       protect = c("x", "y"),
-      func = c(pkg = NULL, fun = "xgb_train"),
+      func = c(pkg = "parsnip", fun = "xgb_train"),
       defaults =
         list(
           nthread = 1,
           verbose = 0
         )
     ),
-    pred = list(
+    numeric = list(
       pre = NULL,
       post = NULL,
       func = c(fun = "xgb_pred"),
@@ -43,7 +43,7 @@ boost_tree_xgboost_data <-
           newdata = quote(new_data)
         )
     ),
-    classes = list(
+    class = list(
       pre = NULL,
       post = function(x, object) {
         if (is.vector(x)) {
@@ -60,7 +60,7 @@ boost_tree_xgboost_data <-
           newdata = quote(new_data)
         )
     ),
-    prob = list(
+    classprob = list(
       pre = NULL,
       post = function(x, object) {
         if (is.vector(x)) {
@@ -96,10 +96,10 @@ boost_tree_C5.0_data <-
     fit = list(
       interface = "data.frame",
       protect = c("x", "y", "weights"),
-      func = c(pkg = NULL, fun = "C5.0_train"),
+      func = c(pkg = "parsnip", fun = "C5.0_train"),
       defaults = list()
     ),
-    classes = list(
+    class = list(
       pre = NULL,
       post = NULL,
       func = c(fun = "predict"),
@@ -108,7 +108,7 @@ boost_tree_C5.0_data <-
         newdata = quote(new_data)
       )
     ),
-    prob = list(
+    classprob = list(
       pre = NULL,
       post = function(x, object) {
         as_tibble(x)
@@ -144,7 +144,7 @@ boost_tree_spark_data <-
           seed = expr(sample.int(10^5, 1))
         )
     ),
-    pred = list(
+    numeric = list(
       pre = NULL,
       post = format_spark_num,
       func = c(pkg = "sparklyr", fun = "ml_predict"),
@@ -154,7 +154,7 @@ boost_tree_spark_data <-
           dataset = quote(new_data)
         )
     ),
-    classes = list(
+    class = list(
       pre = NULL,
       post = format_spark_class,
       func = c(pkg = "sparklyr", fun = "ml_predict"),
@@ -164,7 +164,7 @@ boost_tree_spark_data <-
           dataset = quote(new_data)
         )
     ),
-    prob = list(
+    classprob = list(
       pre = NULL,
       post = format_spark_probs,
       func = c(pkg = "sparklyr", fun = "ml_predict"),

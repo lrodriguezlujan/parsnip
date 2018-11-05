@@ -15,25 +15,21 @@
 #' }
 #' These arguments are converted to their specific names at the
 #'  time that the model is fit. Other options and argument can be
-#'  set using the `others` argument. If left to their defaults
+#'  set using `set_engine`. If left to their defaults
 #'  here (`NULL`), the values are taken from the underlying model
 #'  functions. If parameters need to be modified, `update` can be used
 #'  in lieu of recreating the object from scratch.
 #'
+#' @inheritParams boost_tree
 #' @param mode A single character string for the type of model.
 #'  Possible values for this model are "unknown", "regression", or
 #'  "classification".
-#' @param others A named list of arguments to be used by the
-#'  underlying models (e.g., `ranger::ranger`,
-#'  `randomForest::randomForest`, etc.). .
 #' @param mtry An integer for the number of predictors that will
 #'  be randomly sampled at each split when creating the tree models.
 #' @param trees An integer for the number of trees contained in
 #'  the ensemble.
 #' @param min_n An integer for the minimum number of data points
 #'  in a node that are required for the node to be split further.
-#' @param ... Used for method consistency. Any arguments passed to
-#'  the ellipses will result in an error. Use `others` instead.
 #' @details
 #' The model can be created using the `fit()` function using the
 #'  following _engines_:
@@ -42,14 +38,11 @@
 #' \item \pkg{Spark}: `"spark"`
 #' }
 #'
-#' Main parameter arguments (and those in `others`) can avoid
-#'  evaluation until the underlying function is executed by wrapping the
-#'  argument in [rlang::expr()] (e.g. `mtry = expr(floor(sqrt(p)))`).
+#' @section Engine Details:
 #'
 #' Engines may have pre-set default arguments when executing the
-#'  model fit call. These can be changed by using the `others`
-#'  argument to pass in the preferred values. For this type of
-#'  model, the template of the fit calls are:
+#'  model fit call. For this type of
+#'  model, the template of the fit calls are::
 #'
 #' \pkg{ranger} classification
 #'
@@ -102,29 +95,22 @@
 #' @export
 
 rand_forest <-
-  function(mode = "unknown",
-           mtry = NULL, trees = NULL, min_n = NULL,
-           others = list(),
-           ...) {
-    check_empty_ellipse(...)
+  function(mode = "unknown", mtry = NULL, trees = NULL, min_n = NULL) {
 
-    ## TODO: make a utility function here
-    if (!(mode %in% rand_forest_modes))
-      stop("`mode` should be one of: ",
-           paste0("'", rand_forest_modes, "'", collapse = ", "),
-           call. = FALSE)
+    args <- list(
+      mtry   = enquo(mtry),
+      trees  = enquo(trees),
+      min_n  = enquo(min_n)
+    )
 
-    args <- list(mtry = mtry, trees = trees, min_n = min_n)
-
-    no_value <- !vapply(others, is.null, logical(1))
-    others <- others[no_value]
-
-    # write a constructor function
-    out <- list(args = args, others = others,
-                mode = mode, method = NULL, engine = NULL)
-    # TODO: make_classes has wrong order; go from specific to general
-    class(out) <- make_classes("rand_forest")
-    out
+    new_model_spec(
+      "rand_forest",
+      args = args,
+      eng_args = NULL,
+      mode = mode,
+      method = NULL,
+      engine = NULL
+    )
   }
 
 #' @export
@@ -142,11 +128,8 @@ print.rand_forest <- function(x, ...) {
 # ------------------------------------------------------------------------------
 
 #' @export
-#' @inheritParams rand_forest
+#' @inheritParams update.boost_tree
 #' @param object A random forest model specification.
-#' @param fresh A logical for whether the arguments should be
-#'  modified in-place of or replaced wholesale.
-#' @return An updated model specification.
 #' @examples
 #' model <- rand_forest(mtry = 10, min_n = 3)
 #' model
@@ -158,12 +141,13 @@ print.rand_forest <- function(x, ...) {
 update.rand_forest <-
   function(object,
            mtry = NULL, trees = NULL, min_n = NULL,
-           others = list(),
-           fresh = FALSE,
-           ...) {
-    check_empty_ellipse(...)
-
-    args <- list(mtry = mtry, trees = trees, min_n = min_n)
+           fresh = FALSE, ...) {
+    update_dot_check(...)
+    args <- list(
+      mtry   = enquo(mtry),
+      trees  = enquo(trees),
+      min_n  = enquo(min_n)
+    )
 
     # TODO make these blocks into a function and document well
     if (fresh) {
@@ -176,50 +160,69 @@ update.rand_forest <-
         object$args[names(args)] <- args
     }
 
-    if (length(others) > 0) {
-      if (fresh)
-        object$others <- others
-      else
-        object$others[names(others)] <- others
-    }
-
-    object
+    new_model_spec(
+      "rand_forest",
+      args = object$args,
+      eng_args = object$eng_args,
+      mode = object$mode,
+      method = NULL,
+      engine = object$engine
+    )
   }
 
 # ------------------------------------------------------------------------------
 
 #' @export
-translate.rand_forest <- function(x, engine, ...) {
+translate.rand_forest <- function(x, engine = x$engine, ...) {
+  if (is.null(engine)) {
+    message("Used `engine = 'ranger'` for translation.")
+    engine <- "ranger"
+  }
+
   x <- translate.default(x, engine, ...)
 
+  # slightly cleaner code using
+  arg_vals <- x$method$fit$args
+
   if (x$engine == "spark") {
-    if (x$mode == "unknown")
+    if (x$mode == "unknown") {
       stop(
         "For spark random forests models, the mode cannot be 'unknown' ",
         "if the specification is to be translated.",
         call. = FALSE
       )
-    else
-      x$method$fit$args$type <- x$mode
+    } else {
+      arg_vals$type <- x$mode
+    }
 
-    # See "Details" in ?ml_random_forest_classifier
-    if (is.numeric(x$method$fit$args$feature_subset_strategy))
-      x$method$fit$args$feature_subset_strategy <-
-        paste(x$method$fit$args$feature_subset_strategy)
-
+    # See "Details" in ?ml_random_forest_classifier. `feature_subset_strategy`
+    # should be character even if it contains a number.
+    if (any(names(arg_vals) == "feature_subset_strategy") &&
+        isTRUE(is.numeric(quo_get_expr(arg_vals$feature_subset_strategy)))) {
+      arg_vals$feature_subset_strategy <-
+        paste(quo_get_expr(arg_vals$feature_subset_strategy))
+    }
   }
 
   # add checks to error trap or change things for this method
-  if (x$engine == "ranger") {
-    if (any(names(x$method$fit$args) == "importance"))
-      if (is.logical(x$method$fit$args$importance))
+  if (engine == "ranger") {
+    if (any(names(arg_vals) == "importance"))
+      if (isTRUE(is.logical(quo_get_expr(arg_vals$importance))))
         stop("`importance` should be a character value. See ?ranger::ranger.",
              call. = FALSE)
     # unless otherwise specified, classification models are probability forests
-    if (x$mode == "classification" && !any(names(x$method$fit$args) == "probability"))
-      x$method$fit$args$probability <- TRUE
+    if (x$mode == "classification" && !any(names(arg_vals) == "probability"))
+      arg_vals$probability <- TRUE
 
   }
+  x$method$fit$args <- arg_vals
+
   x
 }
 
+# ------------------------------------------------------------------------------
+
+check_args.rand_forest <- function(object) {
+  # move translate checks here?
+  invisible(object)
+}

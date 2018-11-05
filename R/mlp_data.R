@@ -22,10 +22,10 @@ mlp_keras_data <-
     fit = list(
       interface = "matrix",
       protect = c("x", "y"),
-      func = c(pkg = NULL, fun = "keras_mlp"),
+      func = c(pkg = "parsnip", fun = "keras_mlp"),
       defaults = list()
     ),
-    pred = list(
+    numeric = list(
       pre = NULL,
       post = maybe_multivariate,
       func = c(fun = "predict"),
@@ -35,26 +35,26 @@ mlp_keras_data <-
           x = quote(as.matrix(new_data))
         )
     ),
-    classes = list(
+    class = list(
       pre = NULL,
       post = function(x, object) {
         object$lvl[x + 1]
       },
-      func = c(fun = "predict_classes"),
+      func = c(pkg = "keras", fun = "predict_classes"),
       args =
         list(
           object = quote(object$fit),
           x = quote(as.matrix(new_data))
         )
     ),
-    prob = list(
+    classprob = list(
       pre = NULL,
       post = function(x, object) {
         x <- as_tibble(x)
         colnames(x) <- object$lvl
         x
       },
-      func = c(fun = "predict_proba"),
+      func = c(pkg = "keras", fun = "predict_proba"),
       args =
         list(
           object = quote(object$fit),
@@ -72,6 +72,17 @@ mlp_keras_data <-
     )
   )
 
+
+nnet_softmax <- function(results, object) {
+  if (ncol(results) == 1)
+    results <- cbind(1 - results, results)
+    
+  results <- apply(results, 1, function(x) exp(x)/sum(exp(x)))
+  results <- as_tibble(t(results))
+  names(results) <- paste0(".pred_", object$lvl)
+  results
+}
+
 mlp_nnet_data <-
   list(
     libs = "nnet",
@@ -81,7 +92,7 @@ mlp_nnet_data <-
       func = c(pkg = "nnet", fun = "nnet"),
       defaults = list(trace = FALSE)
     ),
-    pred = list(
+    numeric = list(
       pre = NULL,
       post = maybe_multivariate,
       func = c(fun = "predict"),
@@ -92,7 +103,7 @@ mlp_nnet_data <-
           type = "raw"
         )
     ),
-    classes = list(
+    class = list(
       pre = NULL,
       post = NULL,
       func = c(fun = "predict"),
@@ -101,6 +112,17 @@ mlp_nnet_data <-
           object = quote(object$fit),
           newdata = quote(new_data),
           type = "class"
+        )
+    ),
+    classprob = list(
+      pre = NULL,
+      post = nnet_softmax,
+      func = c(fun = "predict"),
+      args =
+        list(
+          object = quote(object$fit),
+          newdata = quote(new_data),
+          type = "raw"
         )
     ),
     raw = list(
@@ -113,6 +135,7 @@ mlp_nnet_data <-
         )
     )
   )
+
 
 # ------------------------------------------------------------------------------
 
@@ -131,6 +154,27 @@ class2ind <- function (x, drop2nd = FALSE) {
   y
 }
 
+
+#' Simple interface to MLP models via keras
+#'
+#' Instead of building a `keras` model sequentially, `keras_mlp` can be used to
+#'  create a feedforward network with a single hidden layer. Regularization is
+#'  via either weight decay or dropout.
+#'
+#' @param x A data frame or matrix of predictors
+#' @param y A vector (factor or numeric) or matrix (numeric) of outcome data.
+#' @param hidden_units An integer for the number of hidden units.
+#' @param decay A non-negative real number for the amount of weight decay. Either
+#'  this parameter _or_ `dropout` can specified.
+#' @param dropout The proportion of parameters to set to zero. Either
+#'  this parameter _or_ `decay` can specified.
+#' @param epochs An integer for the number of passes through the data.
+#' @param act A character string for the type of activation function between layers.
+#' @param seeds A vector of three positive integers to control randomness of the
+#'  calculations.
+#' @param ... Currently ignored.
+#' @return A `keras` model object.
+#' @export
 keras_mlp <-
   function(x, y,
            hidden_units = 5, decay = 0, dropout = 0, epochs = 20, act = "softmax",
@@ -155,7 +199,7 @@ keras_mlp <-
       else
         y <- matrix(y, ncol = 1)
     }
-    
+
     model <- keras::keras_model_sequential()
     if(decay > 0) {
       model %>%

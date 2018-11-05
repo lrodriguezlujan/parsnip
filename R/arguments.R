@@ -1,31 +1,11 @@
 #' @import rlang
 
-does_it_vary <- function(x) {
-  if(is.null(x)) {
-    res <- FALSE
-  } else {
-    res <- if(is_quosure(x))
-      isTRUE(all.equal(x[[-1]], quote(varying())))
-    else
-      isTRUE(all.equal(x, quote(varying())))
-  }
-  res
-}
-
 null_value <- function(x) {
   res <- if(is_quosure(x))
     isTRUE(all.equal(x[[-1]], quote(NULL))) else
       isTRUE(all.equal(x, NULL))
   res
 }
-
-#' A Placeholder Function for Argument Values
-#'
-#' [varying()] is used when a parameter will be specified at a later date.
-#' @export
-varying <- function()
-  quote(varying())
-
 
 deharmonize <- function(args, key, engine) {
   nms <- names(args)
@@ -70,7 +50,7 @@ prune_arg_list <- function(x, whitelist = NULL, modified = character(0)) {
   x
 }
 
-check_others <- function(args, obj, core_args) {
+check_eng_args <- function(args, obj, core_args) {
   # Make sure that we are not trying to modify an argument that
   # is explicitly protected in the method metadata or arg_key
   protected_args <- unique(c(obj$protect, core_args))
@@ -83,4 +63,80 @@ check_others <- function(args, obj, core_args) {
             common_args, call. = FALSE)
   }
   args
+}
+
+#' Change elements of a model specification
+#'
+#' `set_args` can be used to modify the arguments of a model specification while
+#'  `set_mode` is used to change the model's mode.
+#'
+#' @param object A model specification.
+#' @param ... One or more named model arguments.
+#' @param mode A character string for the model type (e.g. "classification" or
+#'  "regression")
+#' @return An updated model object.
+#' @details `set_args` will replace existing values of the arguments.
+#'
+#' @examples
+#' rand_forest()
+#'
+#' rand_forest() %>%
+#'   set_args(mtry = 3, importance = TRUE) %>%
+#'   set_mode("regression")
+#'
+#' @export
+set_args <- function(object, ...) {
+  the_dots <- enquos(...)
+  if (length(the_dots) == 0)
+    stop("Please pass at least one named argument.", call. = FALSE)
+  main_args <- names(object$args)
+  new_args <- names(the_dots)
+  for (i in new_args) {
+    if (any(main_args == i)) {
+      object$args[[i]] <- the_dots[[i]]
+    } else {
+      object$eng_args[[i]] <- the_dots[[i]]
+    }
+  }
+  new_model_spec(
+    cls = class(object)[1],
+    args = object$args,
+    eng_args = object$eng_args,
+    mode = object$mode,
+    method = NULL,
+    engine = object$engine
+  )
+}
+
+#' @rdname set_args
+#' @export
+set_mode <- function(object, mode) {
+  if (is.null(mode))
+    return(object)
+  mode <- mode[1]
+  if (!(any(all_modes == mode))) {
+    stop("`mode` should be one of ",
+         paste0("'", all_modes, "'", collapse = ", "),
+         call. = FALSE)
+  }
+  object$mode <- mode
+  object
+}
+
+# ------------------------------------------------------------------------------
+
+#' @importFrom rlang eval_tidy
+#' @importFrom purrr map
+maybe_eval <- function(x) {
+  # if descriptors are in `x`, eval fails
+  y <- try(rlang::eval_tidy(x), silent = TRUE)
+  if (inherits(y, "try-error"))
+    y <- x
+  y
+}
+
+eval_args <- function(spec, ...) {
+  spec$args   <- purrr::map(spec$args,   maybe_eval)
+  spec$eng_args <- purrr::map(spec$eng_args, maybe_eval)
+  spec
 }

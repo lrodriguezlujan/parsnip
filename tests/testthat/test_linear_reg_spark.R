@@ -1,9 +1,10 @@
 library(testthat)
-context("linear regression execution with spark")
 library(parsnip)
 library(dplyr)
 
 # ------------------------------------------------------------------------------
+
+context("linear regression execution with spark")
 
 ctrl <- fit_control(verbosity = 1, catch = FALSE)
 caught_ctrl <- fit_control(verbosity = 1, catch = TRUE)
@@ -27,8 +28,7 @@ test_that('spark execution', {
   expect_error(
     spark_fit <-
       fit(
-        linear_reg(),
-        engine = "spark",
+        linear_reg() %>% set_engine("spark"),
         control = ctrl,
         Sepal_Length ~ .,
         data = iris_linreg_tr
@@ -42,7 +42,7 @@ test_that('spark execution', {
   )
 
   expect_error(
-    spark_pred_num <- predict_num(spark_fit, iris_linreg_te),
+    spark_pred_num <- predict_numeric(spark_fit, iris_linreg_te),
     regexp = NA
   )
 

@@ -1,6 +1,9 @@
+^tests/testthat/*\.log$
+^tests/testthat/logs$
 ^_pkgdown\.yml$
 ^docs$
 ^pkgdown$
 ^parsnip\.Rproj$
 ^\.Rproj\.user$
 ^.travis.yml$
+^R/README\.md$

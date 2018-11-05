@@ -18,7 +18,7 @@ make_classes <- function(prefix) {
 check_empty_ellipse <- function (...)  {
   terms <- quos(...)
   if (!is_empty(terms))
-    stop("Please pass other arguments to the model function via `others`", call. = FALSE)
+    stop("Please pass other arguments to the model function via `set_engine`", call. = FALSE)
   terms
 }
 
@@ -35,7 +35,6 @@ deparserizer <- function(x, limit = options()$width - 10) {
 }
 
 print_arg_list <- function(x, ...) {
-  others <- c("name", "call", "expression")
   atomic <- vapply(x, is.atomic, logical(1))
   x2 <- x
   x2[!atomic] <-  lapply(x2[!atomic], deparserizer, ...)
@@ -56,11 +55,13 @@ model_printer <- function(x, ...) {
   non_null_args <- x$args[!vapply(x$args, null_value, lgl(1))]
   if (length(non_null_args) > 0) {
     cat("Main Arguments:\n")
+    non_null_args <- map(non_null_args, convert_arg)
     cat(print_arg_list(non_null_args), "\n", sep = "")
   }
-  if (length(x$others) > 0) {
+  if (length(x$eng_args) > 0) {
     cat("Engine-Specific Arguments:\n")
-    cat(print_arg_list(x$others), "\n", sep = "")
+    x$eng_args <- map(x$eng_args, convert_arg)
+    cat(print_arg_list(x$eng_args), "\n", sep = "")
   }
   if (!is.null(x$engine)) {
     cat("Computational engine:", x$engine, "\n\n")
@@ -78,12 +79,6 @@ model_printer <- function(x, ...) {
   }
 }
 
-load_libs <- function(x, quiet) {
-  for (pkg in x$method$libs)
-    suppressPackageStartupMessages(requireNamespace(pkg, quietly = quiet))
-  invisible(x)
-}
-
 is_missing_arg <- function(x)
   identical(x, quote(missing_arg()))
 
@@ -95,6 +90,8 @@ is_missing_arg <- function(x)
 #' @keywords internal
 #' @export
 show_call <- function(object) {
+  object$method$fit$args <-
+    map(object$method$fit$args, convert_arg)
   if (
     is.null(object$method$fit$func["pkg"]) ||
     is.na(object$method$fit$func["pkg"])
@@ -109,7 +106,16 @@ show_call <- function(object) {
   res
 }
 
+convert_arg <- function(x) {
+  if (is_quosure(x))
+    quo_get_expr(x)
+  else
+    x
+}
+
 make_call <- function(fun, ns, args, ...) {
+
+  #args <- map(args, convert_arg)
 
   # remove any null or placeholders (`missing_args`) that remain
   discard <-
@@ -154,5 +160,72 @@ show_fit <- function(mod, eng) {
     call_text,
     "\n}\n\n"
   )
+}
+
+# Check non-translated core arguments
+# Each model has its own definition of this
+check_args <- function(object) {
+  UseMethod("check_args")
+}
+
+check_args.default <- function(object) {
+  invisible(object)
+}
+
+# ------------------------------------------------------------------------------
+
+# copied form recipes
+
+names0 <- function (num, prefix = "x") {
+  if (num < 1)
+    stop("`num` should be > 0", call. = FALSE)
+  ind <- format(1:num)
+  ind <- gsub(" ", "0", ind)
+  paste0(prefix, ind)
+}
+
+
+# ------------------------------------------------------------------------------
+
+update_dot_check <- function(...) {
+  dots <- enquos(...)
+  if (length(dots) > 0)
+    stop("Extra arguments will be ignored: ",
+         paste0("`", names(dots), "`", collapse = ", "),
+         call. = FALSE)
+  invisible(NULL)
+}
+
+# ------------------------------------------------------------------------------
+
+new_model_spec <- function(cls, args, eng_args, mode, method, engine) {
+  spec_modes <- get(paste0(cls, "_modes"))
+  if (!(mode %in% spec_modes))
+    stop("`mode` should be one of: ",
+         paste0("'", spec_modes, "'", collapse = ", "),
+         call. = FALSE)
+
+  out <- list(args = args, eng_args = eng_args,
+              mode = mode, method = method, engine = engine)
+  class(out) <- make_classes(cls)
+  out
+}
+
+# ------------------------------------------------------------------------------
+
+check_outcome <- function(y, spec) {
+  if (spec$mode == "unknown") {
+    return(invisible(NULL))
+  } else if (spec$mode == "regression") {
+    if (!is.numeric(y))
+      stop("The model outcome should be numeric for regression models.",
+           call. = FALSE)
+  } else if (spec$mode == "classification") {
+    if (!is.factor(y)) {
+      stop("The model outcome should be a factor for regression models.",
+           call. = FALSE)
+    }
+  }
+  invisible(NULL)
 }
 

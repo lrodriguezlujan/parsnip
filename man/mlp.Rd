@@ -6,12 +6,11 @@
 \title{General Interface for Single Layer Neural Network}
 \usage{
 mlp(mode = "unknown", hidden_units = NULL, penalty = NULL,
-  dropout = NULL, epochs = NULL, activation = NULL,
-  others = list(), ...)
+  dropout = NULL, epochs = NULL, activation = NULL)
 
 \method{update}{mlp}(object, hidden_units = NULL, penalty = NULL,
-  dropout = NULL, epochs = NULL, activation = NULL,
-  others = list(), fresh = FALSE, ...)
+  dropout = NULL, epochs = NULL, activation = NULL, fresh = FALSE,
+  ...)
 }
 \arguments{
 \item{mode}{A single character string for the type of model.
@@ -34,20 +33,12 @@ function between the hidden and output layers is automatically set to either
 "linear" or "softmax" depending on the type of outcome. Possible values are:
 "linear", "softmax", "relu", and "elu"}
 
-\item{others}{A named list of arguments to be used by the
-underlying models (e.g., \code{nnet::nnet},
-\code{keras::fit}, \code{keras::compile}, etc.). .}
-
-\item{...}{Used for method consistency. Any arguments passed to
-the ellipses will result in an error. Use \code{others} instead.}
-
 \item{object}{A random forest model specification.}
 
 \item{fresh}{A logical for whether the arguments should be
 modified in-place of or replaced wholesale.}
-}
-\value{
-An updated model specification.
+
+\item{...}{Not used for \code{update}.}
 }
 \description{
 \code{mlp}, for multilayer perceptron, is a way to generate a \emph{specification} of
@@ -72,7 +63,7 @@ in lieu of recreating the object from scratch.
 \details{
 These arguments are converted to their specific names at the
 time that the model is fit. Other options and argument can be
-set using the \code{others} argument. If left to their defaults
+set using \code{set_engine}. If left to their defaults
 here (see above), the values are taken from the underlying model
 functions. One exception is \code{hidden_units} when \code{nnet::nnet} is used; that
 function's \code{size} argument has no default so a value of 5 units will be
@@ -88,16 +79,14 @@ following \emph{engines}:
 \item \pkg{keras}: \code{"keras"}
 }
 
-Main parameter arguments (and those in \code{others}) can avoid
-evaluation until the underlying function is executed by wrapping the
-argument in \code{\link[rlang:expr]{rlang::expr()}} (e.g. \code{hidden_units = expr(num_preds * 2)}).
-
 An error is thrown if both \code{penalty} and \code{dropout} are specified for
 \code{keras} models.
+}
+\section{Engine Details}{
+
 
 Engines may have pre-set default arguments when executing the
-model fit call. These can be changed by using the \code{others}
-argument to pass in the preferred values. For this type of
+model fit call. For this type of
 model, the template of the fit calls are:
 
 \pkg{keras} classification
@@ -116,6 +105,7 @@ model, the template of the fit calls are:
 
 \Sexpr[results=rd]{parsnip:::show_fit(parsnip:::mlp(mode = "regression"), "nnet")}
 }
+
 \examples{
 mlp(mode = "classification", penalty = 0.01)
 # Parameters can be represented by a placeholder:

@@ -1,11 +1,14 @@
 template:
   package: tidytemplate
-  default_assets: false
+  params:
+    part_of: <a href="https://github.com/tidymodels">tidymodels</a>
+    footer: <code>parsnip</code> is a part of the <strong>tidymodels</strong> ecosystem, a collection of modeling packages designed with common APIs and a shared philosophy.
 
 # https://github.com/tidyverse/tidytemplate for css
 
 development:
   mode: auto
+
 
 figures:
   fig.width: 8
@@ -15,24 +18,33 @@ reference:
   - title: Models
     contents:
       - boost_tree
+      - decision_tree
       - linear_reg
       - logistic_reg
       - mars
       - mlp  
       - multinom_reg 
+      - nearest_neighbor
       - rand_forest
       - surv_reg   
+      - svm_poly
+      - svm_rbf
   - title: Infrastructure
     contents:
-      - model_spec
-      - model_fit
-      - predict.model_fit
-      - translate
+      - descriptors
       - fit.model_spec
       - fit_xy
       - fit_control
+      - model_fit  
+      - model_spec
+      - predict.model_fit
+      - set_args
+      - set_engine
+      - set_mode
+      - translate
       - varying
-      - descriptors
+      - varying_args
+
   - title: Data
     contents:
      - lending_club   

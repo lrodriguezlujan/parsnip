@@ -6,10 +6,10 @@
 \title{General Interface for MARS}
 \usage{
 mars(mode = "unknown", num_terms = NULL, prod_degree = NULL,
-  prune_method = NULL, others = list(), ...)
+  prune_method = NULL)
 
 \method{update}{mars}(object, num_terms = NULL, prod_degree = NULL,
-  prune_method = NULL, others = list(), fresh = FALSE, ...)
+  prune_method = NULL, fresh = FALSE, ...)
 }
 \arguments{
 \item{mode}{A single character string for the type of model.
@@ -23,22 +23,12 @@ final model, including the intercept.}
 
 \item{prune_method}{The pruning method.}
 
-\item{others}{A named list of arguments to be used by the
-underlying models (e.g., \code{earth::earth}, etc.). If the outcome is a factor
-and \code{mode = "classification"}, \code{others} can include the \code{glm} argument to
-\code{earth::earth}. If this argument is not passed, it will be added prior to
-the fitting occurs.}
-
-\item{...}{Used for method consistency. Any arguments passed to
-the ellipses will result in an error. Use \code{others} instead.}
-
 \item{object}{A MARS model specification.}
 
 \item{fresh}{A logical for whether the arguments should be
 modified in-place of or replaced wholesale.}
-}
-\value{
-An updated model specification.
+
+\item{...}{Not used for \code{update}.}
 }
 \description{
 \code{mars} is a way to generate a \emph{specification} of a model before
@@ -56,25 +46,23 @@ in \code{?earth}.
 }
 These arguments are converted to their specific names at the
 time that the model is fit. Other options and argument can be
-set using the \code{others} argument. If left to their defaults
+set using \code{set_engine}. If left to their defaults
 here (\code{NULL}), the values are taken from the underlying model
 functions. If parameters need to be modified, \code{update} can be used
 in lieu of recreating the object from scratch.
 }
 \details{
-Main parameter arguments (and those in \code{others}) can avoid
-evaluation until the underlying function is executed by wrapping the
-argument in \code{\link[rlang:expr]{rlang::expr()}}.
-
 The model can be created using the \code{fit()} function using the
 following \emph{engines}:
 \itemize{
 \item \pkg{R}:  \code{"earth"}
 }
+}
+\section{Engine Details}{
+
 
 Engines may have pre-set default arguments when executing the
-model fit call. These can be changed by using the \code{others}
-argument to pass in the preferred values. For this type of
+model fit call.  For this type of
 model, the template of the fit calls are:
 
 \pkg{earth} classification
@@ -89,6 +77,7 @@ Note that, when the model is fit, the \pkg{earth} package only has its
 namespace loaded. However, if \code{multi_predict} is used, the package is
 attached.
 }
+
 \examples{
 mars(mode = "regression", num_terms = 5)
 model <- mars(num_terms = 10, prune_method = "none")
