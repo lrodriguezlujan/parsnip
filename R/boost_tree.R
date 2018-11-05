@@ -549,7 +549,8 @@ catboost_train <- function(
   x <- catboost::catboost.load_pool(x,
                                     label = y,
                                     feature_names = as.list(colnames(x)),
-                                    weight = weights)
+                                    weight = weights,
+                                    cat_features = which(sapply(x, is.factor), arr.ind = TRUE) -1)
 
   # `colsample_bytree` to be on (0, 1] if not
 
@@ -577,11 +578,13 @@ catboost_train <- function(
     }
 
     test_weights <- others$test_weights
+    test_data <- as.data.frame(others$test_data)[,colnames(x)]
 
-    tpool <- catboost::catboost.load_pool(as.data.frame(others$test_data)[,colnames(x)],
+    tpool <- catboost::catboost.load_pool(test_data,
                                           label = test_label,
                                           feature_names = as.list(colnames(x)),
-                                          weight = test_weights)
+                                          weight = test_weights,
+                                          cat_features = which(sapply(test_data, is.factor), arr.ind = TRUE) - 1)
   } else {
     tpool <- NULL
   }
@@ -613,7 +616,11 @@ catboost_train <- function(
 
 catboost_pred <- function(object, newdata, pred_type, ...) {
 
-  newdata <- catboost::catboost.load_pool(newdata, feature_names = as.list(colnames(newdata)))
+
+  newdata <- catboost::catboost.load_pool(newdata,
+                                          feature_names = as.list(colnames(newdata)),
+                                          cat_features = which(sapply(newdata, is.factor), arr.ind = TRUE) - 1)
+
 
   res <- catboost::catboost.predict(object, newdata, verbose = FALSE,
                                     prediction_type = pred_type, ...)
